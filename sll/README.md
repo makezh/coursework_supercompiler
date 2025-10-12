@@ -22,27 +22,31 @@
 ## 🔤 Грамматика (EBNF)
 
 ```ebnf
-Program     = { TypeDef | FunDef } ;
+Module      ::= { TypeDecl | FunDecl }
 
-TypeDef     = "type" "[" TypeCon { TypeVar } "]" ":" Alt { "|" Alt } "." ;
-Alt         = ConName { Type } ;
+TypeDecl    ::= "type" TypeHead ":" AltList "."
+TypeHead    ::= "[" ConstrName { TypeVar } "]"      // напр. [List x], [Pair x y]
+AltList     ::= Alt { "|" Alt }
+Alt         ::= ConstrName { TypeAtom }             // Cons x [List x] | Nil
 
-FunDef      = "fun" "(" FunSig ")" "->" Type ":" Clause { "|" Clause } "." ;
-FunSig      = FunName { Type } ;
-Clause      = "(" FunName { Pattern } ")" "->" Expr ;
+FunDecl     ::= "fun" FunSig ":" ClauseList "."
+FunSig      ::= "(" FunName { TypeAtom } ")" "->" TypeAtom
+ClauseList  ::= Clause { "|" Clause }
+Clause      ::= "(" Pattern ")" "->" Expr
 
-Pattern     = Var
-            | "[" ConName { Pattern } "]" ;
+Pattern     ::= FunName { PatAtom }                 // напр. (append [Cons x xs] ys)
+PatAtom     ::= Var | "[" ConstrName { PatAtom } "]"
 
-Expr        = Var
-            | "(" FunName { Expr } ")"      (* вызов функции *)
-            | "[" ConName { Expr } "]" ;    (* конструктор *)
-            
-Type        = "[" TypeCon { Type } "]"
-            | TypeVar ;
+Expr        ::= Var
+             | "(" FunName { Expr } ")"             // вызов функции
+             | "[" ConstrName { Expr } "]"          // значение-конструктор
 
-Var         = идентификатор (строчная буква в начале) ;
-FunName     = идентификатор (строчная буква в начале) ;
-ConName     = идентификатор (с заглавной буквы в начале) ;
-TypeCon     = идентификатор (с заглавной буквы в начале) ;
-TypeVar     = идентификатор (строчная буква в начале) ;
+TypeAtom    ::= "[" TypeExpr "]"                    // скобки обязательны по синтаксису языка
+TypeExpr    ::= TypeVar
+             | ConstrName { TypeExpr }              // параметризуемый тип-конструктор
+             | "[" TypeExpr "]"                     // вложенность; удобна для [List [List x]]
+
+Var         ::= lcIdent                             // a..z вначале
+FunName     ::= lcIdent
+ConstrName  ::= ucIdent                             // A..Z вначале
+TypeVar     ::= lcIdent
