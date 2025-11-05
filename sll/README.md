@@ -27,10 +27,11 @@ Module      ::= { TypeDecl | FunDecl }
 TypeDecl    ::= "type" TypeHead ":" AltList "."
 TypeHead    ::= "[" ConstrName { TypeVar } "]"                 // [List x], [Pair x y]
 AltList     ::= Alt { "|" Alt }
-Alt         ::= ConstrName { TypeAtom }                        // Cons x [List x] | Nil
+Alt         ::= ConstrName { TypeField }                       // Cons x [List x] | Nil
+TypeField   ::= TypeVar | TypeAnnot
 
 FunDecl     ::= "fun" FunSig ":" ClauseList "."
-FunSig      ::= "(" FunName { TypeAtom } ")" "->" TypeAtom
+FunSig      ::= "(" FunName { TypeAnnot } ")" "->" TypeAnnot
 ClauseList  ::= Clause { "|" Clause }
 Clause      ::= "(" Pattern ")" "->" Expr
 
@@ -42,15 +43,10 @@ Expr        ::= Var
              | "[" ConstrName { Expr } "]"                     // значение-конструктор
              | IntLit                                          // числовой литерал: 0, 1, 42
 
-TypeAtom    ::= "[" TypeExpr "]"                               // типы всегда в []
-TypeExpr    ::= TypeVar
-             | ConstrName { TypeExpr }                         // параметризуемый тип-конструктор
-             | "[" TypeExpr "]"                                // вложенность: [List [List x]]
+TypeAnnot   ::= "[" TypeTerm "]"
+TypeTerm    ::= TypeVar | ConstrName { TypeAnnot }
 
 Var         ::= lcIdent
 FunName     ::= lcIdent
 ConstrName  ::= ucIdent
 TypeVar     ::= lcIdent
-
-IntLit      ::= Digit {Digit}
-Digit       ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
