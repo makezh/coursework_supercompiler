@@ -69,3 +69,40 @@ class Let(Expr):
 
     def __str__(self):
         return f"let {self.var_name} = {self.val} in {self.body}"
+
+# Описание паттерна (то, что слева в уравнении)
+# Например: (append [Cons x xs] ys)
+@dataclass
+class Pattern:
+    name: str          # Имя функции
+    params: List[Expr] # Параметры (там могут быть Var или Ctr)
+
+    def __str__(self):
+        params_str = " ".join(str(p) for p in self.params)
+        return f"({self.name} {params_str})"
+
+# Описание одного правила уравнения
+# Например: (append [Nil] ys) = ys
+@dataclass
+class Rule:
+    """
+    Одно уравнение в программе
+    pattern - левая часть уравнения \n
+    body - правая часть уравнения (выражение)
+    """
+    pattern: Pattern
+    body: Expr
+
+    def __str__(self):
+        return f"{self.pattern} -> {self.body}"
+
+# Описание всей программы
+@dataclass
+class Program:
+    """
+    Вся программа: набор уравнений
+    """
+    rules: List[Rule]
+
+    def __str__(self):
+        return "\n".join(str(rule) + ";" for rule in self.rules)
