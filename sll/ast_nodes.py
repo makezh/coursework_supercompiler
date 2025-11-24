@@ -56,6 +56,13 @@ class FCall(Expr):
 
 
 @dataclass
+class IntLit(Expr):
+    value: int
+
+    def __str__(self): return str(self.value)
+
+
+@dataclass
 class Let(Expr):
     """
     Let-выражение: связывает переменную с выражением в теле \n
@@ -70,16 +77,18 @@ class Let(Expr):
     def __str__(self):
         return f"let {self.var_name} = {self.val} in {self.body}"
 
+
 # Описание паттерна (то, что слева в уравнении)
 # Например: (append [Cons x xs] ys)
 @dataclass
 class Pattern:
-    name: str          # Имя функции
-    params: List[Expr] # Параметры (там могут быть Var или Ctr)
+    name: str  # Имя функции
+    params: List[Expr]  # Параметры (там могут быть Var или Ctr)
 
     def __str__(self):
         params_str = " ".join(str(p) for p in self.params)
         return f"({self.name} {params_str})"
+
 
 # Описание одного правила уравнения
 # Например: (append [Nil] ys) = ys
@@ -95,6 +104,13 @@ class Rule:
 
     def __str__(self):
         return f"{self.pattern} -> {self.body}"
+
+
+@dataclass
+class TypeDef:
+    name: str
+    constrs: List[str]  # Список конструкторов
+
 
 # Описание всей программы
 @dataclass
