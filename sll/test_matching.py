@@ -1,5 +1,5 @@
-from ast_nodes import Var, Ctr
-from matching import match
+from sll.ast_nodes import Var, Ctr
+from sll.matching import match
 
 # Подготовка деталек
 var_x = Var("x")

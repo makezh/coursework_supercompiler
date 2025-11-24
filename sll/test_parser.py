@@ -1,4 +1,5 @@
-from parser import tokenize, parse
+from parser import tokenize, parse, Parser
+from interpreter import step
 
 ### Тест 1: Токенизатор
 text = """
@@ -21,3 +22,20 @@ fun add x y :
 print("--- Парсинг ---")
 program = parse(code)
 print(program)
+
+
+expr_text = "(add [S [Z]] [S [Z]])"
+p = Parser(tokenize(expr_text))
+expr = p.parse_expr()
+
+print(f"\n--- Вычисление: {expr} ---")
+
+curr = expr
+for i in range(1): # Ограничим 10 шагами на всякий случай
+    next_expr = step(curr, program)
+    if next_expr is None:
+        break
+    print(f"Step {i+1}: {next_expr}")
+    curr = next_expr
+
+print(f"Результат: {curr}")

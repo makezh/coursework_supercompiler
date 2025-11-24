@@ -1,4 +1,4 @@
-from ast_nodes import Var, Ctr, FCall, Program, Rule, Pattern
+from sll.ast_nodes import Var, Ctr, FCall, Program, Rule, Pattern
 
 ##############################
 # ПРИМЕР 1: (append [Cons x xs] ys)

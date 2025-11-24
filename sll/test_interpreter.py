@@ -1,4 +1,4 @@
-from ast_nodes import Var, Ctr, FCall, Pattern, Rule, Program
+from sll.ast_nodes import Var, Ctr, FCall, Pattern, Rule, Program
 from interpreter import step
 
 # 1. Строим язык
