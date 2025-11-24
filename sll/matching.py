@@ -1,46 +1,39 @@
-from sll.ast_nodes import Var, Ctr, FCall
+from sll.ast_nodes import Var, Ctr, FCall, IntLit
 
 
 def match(pattern_arg, call_arg):
     """
-    Пытается сопоставить один аргумент из паттерна с аргументом вызова. \n
-    pattern_arg: Часть паттерна (Var или Ctr) \n
-    call_arg: То, с чем вызвали (Expr) \n
-
-    Возвращает: dict {имя_переменной: значение} или None, если не совпало.
+    Пытается сопоставить один аргумент из паттерна с аргументом вызова.
     """
 
-    # СЛУЧАЙ 1: В паттерне стоит переменная (например, 'x')
-    # Переменная "съедает" всё, что угодно.
+    # 1. Переменная "съедает" всё
     if isinstance(pattern_arg, Var):
         return {pattern_arg.name: call_arg}
 
-    # СЛУЧАЙ 2: В паттерне стоит конструктор (например, [Cons x xs])
-    # Мы должны убедиться, что в вызове ТОЖЕ конструктор с ТЕМ ЖЕ именем.
+    # 2. Числовой литерал (НОВОЕ)
+    # Если паттерн ждет число (например, 1), а пришло 1 — это успех.
+    if isinstance(pattern_arg, IntLit):
+        # Проверяем: пришло ли число и равно ли оно нашему
+        if isinstance(call_arg, IntLit) and pattern_arg.value == call_arg.value:
+            return {}  # Совпало, новых переменных не нашли
+        return None  # Не совпало
+
+    # 3. Конструктор
     if isinstance(pattern_arg, Ctr):
-
-        # 2.1 Если пришел НЕ конструктор (например, вызов функции),
-        # то в классической ленивой семантике мы пока не можем сопоставить.
-        # Но для простого теста пока будем считать, что call_arg обязан быть Ctr.
         if not isinstance(call_arg, Ctr):
-            return None
+            return None  # Ждали конструктор, пришло что-то другое
 
-        # 2.2 Не совпали имена конструкторов (ждали [Z], пришло [S ...])
         if pattern_arg.name != call_arg.name:
-            return None
+            return None  # Не совпало имя (Cons vs Nil)
 
-        # 2.3 Количество аргументов у конструкторов должно совпадать
         if len(pattern_arg.args) != len(call_arg.args):
             return None
 
-        # 2.4 Рекурсивно проверяем внутренности
-        # Например: паттерн [Cons x xs], вызов [Cons [Z] [Nil]]
-        # Нам нужно сопоставить x c [Z], и xs с [Nil]
         bindings = {}
         for p_sub, c_sub in zip(pattern_arg.args, call_arg.args):
             res = match(p_sub, c_sub)
             if res is None:
-                return None  # Если хоть одно не подошло — всё не подошло
+                return None
             bindings.update(res)
 
         return bindings
@@ -50,22 +43,24 @@ def match(pattern_arg, call_arg):
 
 def substitute(expr, bindings):
     """
-    Заменяет переменные в выражении expr на значения из словаря bindings. \n
-    Например: expr = (add x y), bindings = {'x': [Z], 'y': [Nil]} \n
-    Результат: (add [Z] [Nil])
+    Заменяет переменные в выражении expr на значения из словаря bindings.
     """
-    # 1. Если это переменная - смотрим, есть ли для нее замена
+    # 1. Переменная — заменяем, если есть на что
     if isinstance(expr, Var):
         if expr.name in bindings:
             return bindings[expr.name]
-        return expr  # Если замены нет, оставляем как есть
+        return expr
 
-    # 2. Если это конструктор - рекурсивно меняем всё внутри него
+    # 2. Число — оставляем как есть (заменять внутри числа нечего)
+    if isinstance(expr, IntLit):
+        return expr
+
+    # 3. Конструктор — рекурсивно заходим внутрь
     if isinstance(expr, Ctr):
         new_args = [substitute(arg, bindings) for arg in expr.args]
         return Ctr(expr.name, new_args)
 
-    # 3. Если это вызов функции - тоже рекурсивно меняем аргументы
+    # 4. Вызов функции — рекурсивно заходим внутрь
     if isinstance(expr, FCall):
         new_args = [substitute(arg, bindings) for arg in expr.args]
         return FCall(expr.name, new_args)
