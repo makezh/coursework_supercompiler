@@ -1,4 +1,4 @@
-from sll.ast_nodes import Var, Ctr, FCall, Pattern, Rule, Program
+from sll.ast_nodes import Var, Ctr, FCall, Pattern, Rule, Program, IntLit
 
 
 def tokenize(text):
@@ -47,6 +47,29 @@ class Parser:
             raise ValueError(f"Ожидалось '{expected}', но получено '{token}' на позиции {self.pos}")
         self.pos += 1
 
+    def skip_type_annot(self):
+        """
+        Пропускает один 'терм' типа (имя или конструктор в скобках).
+        Нужно, чтобы игнорировать типы в сигнатуре функции.
+        """
+        token = self.current()
+        if token == '[':
+            # Если тип сложный [List [Pair x y]], нужно считать баланс скобок
+            balance = 0
+            while True:
+                curr = self.current()
+                if curr == '[':
+                    balance += 1
+                elif curr == ']':
+                    balance -= 1
+
+                self.pos += 1  # Двигаемся дальше
+                if balance == 0:
+                    break
+        else:
+            # Просто имя типа (Int, a, b...)
+            self.pos += 1
+
     def parse_var_or_ctr(self):
         """
         Разбирает имя. \n
@@ -63,6 +86,11 @@ class Parser:
     # --- Парсинг Выражений или Правой часть ---
     def parse_expr(self):
         token = self.current()
+
+        # 0. Число (IntLit)
+        if token.isdigit() or (token.startswith('-') and token[1:].isdigit()):
+            self.pos += 1
+            return IntLit(int(token))
 
         # 1. Конструктор [Name arg1 arg2]
         if token == '[':
@@ -105,8 +133,10 @@ class Parser:
         return Pattern(fun_name, params)
 
     def parse_pat_atom(self):
-        """Парсим аргумент внутри паттерна (переменная или конструктор)"""
+        """Парсим аргумент внутри паттерна (переменная, конструктор или число)"""
         token = self.current()
+
+        # Конструктор
         if token == '[':
             self.eat('[')
             ctr_name = self.tokens[self.pos]
@@ -116,8 +146,14 @@ class Parser:
                 args.append(self.parse_pat_atom())
             self.eat(']')
             return Ctr(ctr_name, args)
+
+        # Число в паттерне
+        elif token.isdigit():
+            self.pos += 1
+            return IntLit(int(token))
+
+        # Переменная
         else:
-            # Переменная
             name = self.tokens[self.pos]
             self.pos += 1
             return Var(name)
@@ -125,20 +161,37 @@ class Parser:
     # --- Парсинг Программы ---
     def parse_program(self):
         rules = []
-        # Мы ожидаем структуру: fun name args : rule | rule .
+        # Мы ожидаем структуру по грамматике:
+        # fun (name args...) -> ret_type : rule | rule .
 
         while self.current() is not None:
             if self.current() == 'fun':
                 self.eat('fun')
-                # Пропускаем имя функции и аргументы до двоеточия
-                while self.current() != ':':
-                    self.pos += 1
-                self.eat(':')
 
-                # Читаем правила
+                # Парсинг сигнатуры
+                self.eat('(')
+                fun_name = self.tokens[self.pos]  # Имя функции
+                self.pos += 1
+
+                # Пропускаем типы аргументов (TypeAnnot)
+                while self.current() != ')':
+                    self.skip_type_annot()
+                self.eat(')')
+
+                self.eat('->')
+                # Пропускаем тип возвращаемого значения
+                self.skip_type_annot()
+
+                self.eat(':')  # Теперь начинаются правила
+
+                # --- Читаем правила ---
                 while True:
                     # Парсим одно правило
                     pat = self.parse_pattern()
+
+                    if pat.name != fun_name:
+                        pass
+
                     self.eat('->')
                     body = self.parse_expr()
                     rules.append(Rule(pat, body))
@@ -153,7 +206,7 @@ class Parser:
                     else:
                         raise ValueError(f"Ожидался '|' или '.', получено '{self.current()}'")
 
-            # Если встретили type, пока пропускаем его определение
+            # Если встретили type, пропускаем его определение
             elif self.current() == 'type':
                 self.eat('type')
                 while self.current() != '.':
