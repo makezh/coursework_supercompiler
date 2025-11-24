@@ -1,4 +1,4 @@
-from ast_nodes import Var, Ctr
+from ast_nodes import Var, Ctr, FCall
 
 
 def match(pattern_arg, call_arg):
@@ -46,3 +46,28 @@ def match(pattern_arg, call_arg):
         return bindings
 
     return None
+
+
+def substitute(expr, bindings):
+    """
+    Заменяет переменные в выражении expr на значения из словаря bindings. \n
+    Например: expr = (add x y), bindings = {'x': [Z], 'y': [Nil]} \n
+    Результат: (add [Z] [Nil])
+    """
+    # 1. Если это переменная - смотрим, есть ли для нее замена
+    if isinstance(expr, Var):
+        if expr.name in bindings:
+            return bindings[expr.name]
+        return expr  # Если замены нет, оставляем как есть
+
+    # 2. Если это конструктор - рекурсивно меняем всё внутри него
+    if isinstance(expr, Ctr):
+        new_args = [substitute(arg, bindings) for arg in expr.args]
+        return Ctr(expr.name, new_args)
+
+    # 3. Если это вызов функции - тоже рекурсивно меняем аргументы
+    if isinstance(expr, FCall):
+        new_args = [substitute(arg, bindings) for arg in expr.args]
+        return FCall(expr.name, new_args)
+
+    return expr
