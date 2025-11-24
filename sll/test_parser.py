@@ -31,7 +31,7 @@ expr = p.parse_expr()
 print(f"\n--- Вычисление: {expr} ---")
 
 curr = expr
-for i in range(1): # Ограничим 10 шагами на всякий случай
+for i in range(10):
     next_expr = step(curr, program)
     if next_expr is None:
         break
