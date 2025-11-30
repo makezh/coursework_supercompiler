@@ -158,14 +158,22 @@ class Program:
     signatures: List[FunSig]   # Список сигнатур функций
 
     def __str__(self):
-        # return "\n".join(str(rule) + ";" for rule in self.rules)
         res = ""
+        # Вывод типов
         for t in self.types:
+            # Формируем строку параметров: если есть params, добавляем пробел перед ними
+            params_str = (" " + " ".join(t.params)) if t.params else ""
+
             constrs = " | ".join(f"{c.name} {' '.join(str(a) for a in c.arg_types)}" for c in t.constructors)
-            res += f"type [{t.name} {' '.join(t.params)}] : {constrs} .\n"
+
+            res += f"type [{t.name}{params_str}] : {constrs} .\n"
+
         res += "\n"
+
+        # Вывод сигнатур
         for s in self.signatures:
             args = " ".join(str(a) for a in s.arg_types)
             res += f"fun ({s.name} {args}) -> {s.ret_type} : ...\n"
+
         return res + "\n" + "\n".join(str(r) + ";" for r in self.rules)
 # --- Конец Правил и Программ ---
