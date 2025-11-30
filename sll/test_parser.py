@@ -33,10 +33,11 @@ fun (add [Nat] [Nat]) -> [Nat] :
 print("\n--- 2. Парсинг программы ---")
 program = parse(code)
 print("Программа успешно считана!")
+print(f"Количество типов: {len(program.types)}")
+print(f"Количество сигнатур: {len(program.signatures)}")
 print(f"Количество правил: {len(program.rules)}")
-print("Правила:")
-for r in program.rules:
-    print(f"  {r}")
+print(program)
+
 
 
 # ==========================================

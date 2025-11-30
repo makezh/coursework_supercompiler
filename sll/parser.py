@@ -163,33 +163,72 @@ class Parser:
 
     # --- Парсинг Программы ---
     def parse_program(self):
-        rules = []
-        # Мы ожидаем структуру по грамматике:
-        # fun (name args...) -> ret_type : rule | rule .
+        rules = [] # Список правил
+        types = [] # Список определений типов
+        sigs = []  # Список сигнатур функций
 
         while self.current() is not None:
-            if self.current() == 'fun':
+
+            # 1. Определение ТИПА
+            if self.current() == 'type':
+                self.eat('type')
+
+                # Читаем голову: [List a]
+                self.eat('[')
+                type_name = self.tokens[self.pos]
+                self.pos += 1
+                type_params = []
+                while self.current() != ']':
+                    type_params.append(self.tokens[self.pos]) # переменные типа 'a'
+                    self.pos += 1
+                self.eat(']')
+
+                self.eat(':')
+
+                constrs = []
+                # Читаем конструкторы: Nil | Cons a [List a]
+                while True:
+                    c_name = self.tokens[self.pos]
+                    self.pos += 1
+                    c_args = []
+                    # Пока не встретим | или . читаем типы аргументов
+                    while self.current() not in ['|', '.']:
+                        c_args.append(self.parse_type_expr())
+
+                    constrs.append(ConstrDef(c_name, c_args))
+
+                    if self.current() == '|':
+                        self.eat('|')
+                        continue
+                    break
+
+                self.eat('.')
+                types.append(TypeDef(type_name, type_params, constrs))
+
+            # 2. Определение ФУНКЦИИ
+            elif self.current() == 'fun':
                 self.eat('fun')
 
-                # Парсинг сигнатуры
+                # Парсинг сигнатуры: (name arg_types) -> ret_type
                 self.eat('(')
-                fun_name = self.tokens[self.pos]  # Имя функции
+                fun_name = self.tokens[self.pos]
                 self.pos += 1
 
-                # Пропускаем типы аргументов (TypeAnnot)
+                arg_types = []
                 while self.current() != ')':
-                    self.skip_type_annot()
+                    arg_types.append(self.parse_type_expr())
                 self.eat(')')
 
                 self.eat('->')
-                # Пропускаем тип возвращаемого значения
-                self.skip_type_annot()
+                ret_type = self.parse_type_expr()
 
-                self.eat(':')  # Теперь начинаются правила
+                self.eat(':')
+
+                # Сохраняем сигнатуру
+                sigs.append(FunSig(fun_name, arg_types, ret_type))
 
                 # --- Читаем правила ---
                 while True:
-                    # Парсим одно правило
                     pat = self.parse_pattern()
 
                     if pat.name != fun_name:
@@ -199,7 +238,6 @@ class Parser:
                     body = self.parse_expr()
                     rules.append(Rule(pat, body))
 
-                    # Смотрим разделитель
                     if self.current() == '|':
                         self.eat('|')
                         continue
@@ -209,17 +247,12 @@ class Parser:
                     else:
                         raise ValueError(f"Ожидался '|' или '.', получено '{self.current()}'")
 
-            # Если встретили type, пропускаем его определение
-            elif self.current() == 'type':
-                self.eat('type')
-                while self.current() != '.':
-                    self.pos += 1
-                self.eat('.')
-
             else:
+                # Если встретили что-то странное
                 break
 
-        return Program(rules)
+        # Возвращаем программу со всеми данными
+        return Program(rules, types, sigs)
 
 
 def parse(text):
