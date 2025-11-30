@@ -1,4 +1,4 @@
-from sll.ast_nodes import Var, Ctr, FCall, Pattern, Rule, Program, IntLit
+from sll.ast_nodes import Var, Ctr, FCall, Pattern, Rule, Program, IntLit, TypeDef, TypeExpr, ConstrDef, FunSig
 
 
 def tokenize(text):
@@ -47,28 +47,31 @@ class Parser:
             raise ValueError(f"Ожидалось '{expected}', но получено '{token}' на позиции {self.pos}")
         self.pos += 1
 
-    def skip_type_annot(self):
+    # --- Парсинг выражений типов ---
+    def parse_type_expr(self):
         """
-        Пропускает один 'терм' типа (имя или конструктор в скобках).
-        Нужно, чтобы игнорировать типы в сигнатуре функции.
+        Парсит выражение типа. \n
+        Примеры: 'a', '[Nat]', '[List [Nat]]'
         """
         token = self.current()
-        if token == '[':
-            # Если тип сложный [List [Pair x y]], нужно считать баланс скобок
-            balance = 0
-            while True:
-                curr = self.current()
-                if curr == '[':
-                    balance += 1
-                elif curr == ']':
-                    balance -= 1
 
-                self.pos += 1  # Двигаемся дальше
-                if balance == 0:
-                    break
-        else:
-            # Просто имя типа (Int, a, b...)
+        # Если начинается с [, это конструктор типа: [List ...]
+        if token == '[':
+            self.eat('[')
+            type_name = self.tokens[self.pos]
             self.pos += 1
+
+            args = []
+            while self.current() != ']':
+                args.append(self.parse_type_expr())
+            self.eat(']')
+            return TypeExpr(type_name, args)
+
+        else:
+            # Это просто имя (переменная типа 'a' или имя типа без скобок)
+            name = self.tokens[self.pos]
+            self.pos += 1
+            return TypeExpr(name, [])
 
     def parse_var_or_ctr(self):
         """
