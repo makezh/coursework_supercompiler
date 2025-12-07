@@ -2,27 +2,70 @@ from sll.ast_nodes import Var, Ctr, FCall, Pattern, Rule, Program, IntLit, TypeD
 
 
 def tokenize(text):
-    # 1. Удаляем комментарии (начинаются с --)
-    lines = text.split('\n')
-    cleaned_lines = []
-    for line in lines:
-        if '--' in line:
-            line = line.split('--')[0]
-        cleaned_lines.append(line)
-    text = ' '.join(cleaned_lines)
+    """
+    Разбивает текст на токены.
+    Возвращает список кортежей: (type, value, lineno).
+    Комментарии вида << ... >>.
+    """
+    tokens = []
+    lineno = 1
+    i = 0
+    n = len(text)
 
-    # 2. Расставляем пробелы вокруг спецсимволов, кроме '->'
-    text = text.replace('->', ' ARROW_TOKEN ')
+    while i < n:
+        char = text[i]
 
-    specials = ['(', ')', '[', ']', ':', '|', '.', '=']
-    for char in specials:
-        text = text.replace(char, f' {char} ')
+        # 1. Пропуск пробелов и подсчет строк
+        if char.isspace():
+            if char == '\n':
+                lineno += 1
+            i += 1
+            continue
 
-    # 3. Разбиваем по пробелам
-    tokens = text.split()
+        # 2. Комментарии << ... >> (Блочные)
+        if char == '<' and i + 1 < n and text[i+1] == '<':
+            i += 2 # Пропускаем <<
+            # Идем пока не встретим >> или конец файла
+            while i + 1 < n and not (text[i] == '>' and text[i+1] == '>'):
+                if text[i] == '\n':
+                    lineno += 1
+                i += 1
+            i += 2 # Пропускаем >>
+            continue
 
-    # 4. Возвращаем '->' на место
-    tokens = [t if t != 'ARROW_TOKEN' else '->' for t in tokens]
+        # 3. Стрелочка ->
+        if char == '-' and i + 1 < n and text[i+1] == '>':
+            tokens.append(('->', '->', lineno))
+            i += 2
+            continue
+
+        # 4. Спецсимволы
+        if char in '()[]:|.=':
+            tokens.append((char, char, lineno))
+            i += 1
+            continue
+
+        # 5. Числа (положительные и отрицательные)
+        if char.isdigit() or (char == '-' and i+1 < n and text[i+1].isdigit()):
+            start = i
+            i += 1
+            while i < n and text[i].isdigit():
+                i += 1
+            val = text[start:i]
+            tokens.append(('INT', int(val), lineno))
+            continue
+
+        # 6. Идентификаторы (слова)
+        if char.isalnum() or char == '_':
+            start = i
+            while i < n and (text[i].isalnum() or text[i] == '_'):
+                i += 1
+            word = text[start:i]
+            tokens.append(('NAME', word, lineno))
+            continue
+
+        raise ValueError(f"Неизвестный символ '{char}' на строке {lineno}")
+
     return tokens
 
 
@@ -37,41 +80,49 @@ class Parser:
             return self.tokens[self.pos]
         return None
 
-    def eat(self, expected):
+    def eat(self, expected_val=None, expected_type=None):
         """
-        Съедает ожидаемый токен. \n
-        Если там что-то другое — ошибка.
+        Съедает токен. Проверяет значение (если передано) или тип (если передан).
+        Возвращает (значение, номер_строки).
         """
         token = self.current()
-        if token != expected:
-            raise ValueError(f"Ожидалось '{expected}', но получено '{token}' на позиции {self.pos}")
+        if token is None:
+            raise ValueError(f"Неожиданный конец файла, ожидалось {expected_val or expected_type}")
+
+        typ, val, line = token
+
+        if expected_val and val != expected_val:
+            raise ValueError(f"Строка {line}: Ожидалось '{expected_val}', получено '{val}'")
+
+        if expected_type and typ != expected_type:
+             raise ValueError(f"Строка {line}: Ожидался тип {expected_type}, получен {typ}")
+
         self.pos += 1
+        return val, line
 
     # --- Парсинг выражений типов ---
     def parse_type_expr(self):
-        """
-        Парсит выражение типа. \n
-        Примеры: 'a', '[Nat]', '[List [Nat]]'
-        """
         token = self.current()
+        if not token:
+            raise ValueError("Неожиданный конец файла при разборе типа")
 
-        # Если начинается с [, это конструктор типа: [List ...]
-        if token == '[':
-            self.eat('[')
-            type_name = self.tokens[self.pos]
-            self.pos += 1
+        _, val, line = token
 
-            args = []
-            while self.current() != ']':
-                args.append(self.parse_type_expr())
-            self.eat(']')
-            return TypeExpr(type_name, args)
+        match val:
+            # Конструктор типа: [List a]
+            case '[':
+                self.eat('[')
+                name, _ = self.eat(expected_type='NAME')
+                args = []
+                while self.current()[1] != ']':
+                    args.append(self.parse_type_expr())
+                self.eat(']')
+                return TypeExpr(name, args, lineno=line)
 
-        else:
-            # Это просто имя (переменная типа 'a' или имя типа без скобок)
-            name = self.tokens[self.pos]
-            self.pos += 1
-            return TypeExpr(name, [])
+            # Переменная типа или простое имя: a, Int
+            case _:
+                name, line = self.eat(expected_type='NAME')
+                return TypeExpr(name, [], lineno=line)
 
     def parse_var_or_ctr(self):
         """
@@ -89,77 +140,78 @@ class Parser:
     # --- Парсинг Выражений или Правой часть ---
     def parse_expr(self):
         token = self.current()
+        if not token:
+             raise ValueError("Неожиданный конец файла при разборе выражения")
 
-        # 0. Число (IntLit)
-        if token.isdigit() or (token.startswith('-') and token[1:].isdigit()):
-            self.pos += 1
-            return IntLit(int(token))
+        typ, val, line = token
 
-        # 1. Конструктор [Name arg1 arg2]
-        if token == '[':
-            self.eat('[')
-            ctr_name = self.tokens[self.pos]
-            self.pos += 1
-            args = []
-            while self.current() != ']':
-                args.append(self.parse_expr())
-            self.eat(']')
-            return Ctr(ctr_name, args)
+        match val:
+            # Конструктор: [Cons x xs]
+            case '[':
+                self.eat('[')
+                name, _ = self.eat(expected_type='NAME')
+                args = []
+                while self.current()[1] != ']':
+                    args.append(self.parse_expr())
+                self.eat(']')
+                return Ctr(name, args, lineno=line)
 
-        # 2. Вызов функции (fun arg1 arg2)
-        elif token == '(':
-            self.eat('(')
-            fun_name = self.tokens[self.pos]
-            self.pos += 1
-            args = []
-            while self.current() != ')':
-                args.append(self.parse_expr())
-            self.eat(')')
-            return FCall(fun_name, args)
+            # Вызов функции: (f x)
+            case '(':
+                self.eat('(')
+                name, _ = self.eat(expected_type='NAME')
+                args = []
+                while self.current()[1] != ')':
+                    args.append(self.parse_expr())
+                self.eat(')')
+                return FCall(name, args, lineno=line)
 
-        # 3. Просто переменная или конструктор-константа
-        else:
-            return self.parse_var_or_ctr()
+            # Число
+            case _ if typ == 'INT':
+                self.eat(expected_type='INT')
+                return IntLit(val, lineno=line)
+
+            # Имя (Переменная или Конструктор без скобок)
+            case _ if typ == 'NAME':
+                self.eat(expected_type='NAME')
+                if val[0].isupper():
+                    return Ctr(val, [], lineno=line)
+                return Var(val, lineno=line)
+
+            case _:
+                raise ValueError(f"Строка {line}: Неожиданное начало выражения '{val}'")
 
     # --- Парсинг Паттернов или Левой части ---
     def parse_pattern(self):
-        # Паттерн всегда в скобках: (funcname arg1 ...)
-        self.eat('(')
-        fun_name = self.tokens[self.pos]
-        self.pos += 1
-
+        _, line = self.eat('(')
+        name, _ = self.eat(expected_type='NAME')
         params = []
-        while self.current() != ')':
+        while self.current()[1] != ')':
             params.append(self.parse_pat_atom())
         self.eat(')')
-
-        return Pattern(fun_name, params)
+        return Pattern(name, params, lineno=line)
 
     def parse_pat_atom(self):
-        """Парсим аргумент внутри паттерна (переменная, конструктор или число)"""
         token = self.current()
+        typ, val, line = token
 
-        # Конструктор
-        if token == '[':
-            self.eat('[')
-            ctr_name = self.tokens[self.pos]
-            self.pos += 1
-            args = []
-            while self.current() != ']':
-                args.append(self.parse_pat_atom())
-            self.eat(']')
-            return Ctr(ctr_name, args)
-
-        # Число в паттерне
-        elif token.isdigit():
-            self.pos += 1
-            return IntLit(int(token))
-
-        # Переменная
-        else:
-            name = self.tokens[self.pos]
-            self.pos += 1
-            return Var(name)
+        match val:
+            case '[':
+                self.eat('[')
+                name, _ = self.eat(expected_type='NAME')
+                args = []
+                while self.current()[1] != ']':
+                    args.append(self.parse_pat_atom())
+                self.eat(']')
+                return Ctr(name, args, lineno=line)
+            case _ if typ == 'INT':
+                self.eat(expected_type='INT')
+                return IntLit(val, lineno=line)
+            case _ if typ == 'NAME':
+                self.eat(expected_type='NAME')
+                return Var(val, lineno=line)
+            case _:
+                raise ValueError(f"Строка {line}: Ошибка в паттерне, неожиданный токен '{val}'")
 
     # --- Парсинг Программы ---
     def parse_program(self):
@@ -168,91 +220,77 @@ class Parser:
         sigs = []  # Список сигнатур функций
 
         while self.current() is not None:
+            val = self.current()[1]
 
-            # 1. Определение ТИПА
-            if self.current() == 'type':
-                self.eat('type')
+            match val:
+                # Объявление типа
+                case 'type':
+                    _, line = self.eat('type')
+                    self.eat('[')
+                    t_name, _ = self.eat(expected_type='NAME')
+                    t_params = []
+                    while self.current()[1] != ']':
+                        p, _ = self.eat(expected_type='NAME')
+                        t_params.append(p)
+                    self.eat(']')
+                    self.eat(':')
 
-                # Читаем голову: [List a]
-                self.eat('[')
-                type_name = self.tokens[self.pos]
-                self.pos += 1
-                type_params = []
-                while self.current() != ']':
-                    type_params.append(self.tokens[self.pos]) # переменные типа 'a'
-                    self.pos += 1
-                self.eat(']')
+                    constrs = []
+                    while True:
+                        c_name, c_line = self.eat(expected_type='NAME')
+                        c_args = []
+                        # Читаем типы аргументов конструктора
+                        while self.current()[1] not in ['|', '.']:
+                            c_args.append(self.parse_type_expr())
+                        constrs.append(ConstrDef(c_name, c_args, lineno=c_line))
 
-                self.eat(':')
+                        if self.current()[1] == '|':
+                            self.eat('|')
+                            continue
+                        break
+                    self.eat('.')
+                    types.append(TypeDef(t_name, t_params, constrs, lineno=line))
 
-                constrs = []
-                # Читаем конструкторы: Nil | Cons a [List a]
-                while True:
-                    c_name = self.tokens[self.pos]
-                    self.pos += 1
-                    c_args = []
-                    # Пока не встретим | или . читаем типы аргументов
-                    while self.current() not in ['|', '.']:
-                        c_args.append(self.parse_type_expr())
+                # Объявление функции
+                case 'fun':
+                    _, line = self.eat('fun')
 
-                    constrs.append(ConstrDef(c_name, c_args))
-
-                    if self.current() == '|':
-                        self.eat('|')
-                        continue
-                    break
-
-                self.eat('.')
-                types.append(TypeDef(type_name, type_params, constrs))
-
-            # 2. Определение ФУНКЦИИ
-            elif self.current() == 'fun':
-                self.eat('fun')
-
-                # Парсинг сигнатуры: (name arg_types) -> ret_type
-                self.eat('(')
-                fun_name = self.tokens[self.pos]
-                self.pos += 1
-
-                arg_types = []
-                while self.current() != ')':
-                    arg_types.append(self.parse_type_expr())
-                self.eat(')')
-
-                self.eat('->')
-                ret_type = self.parse_type_expr()
-
-                self.eat(':')
-
-                # Сохраняем сигнатуру
-                sigs.append(FunSig(fun_name, arg_types, ret_type))
-
-                # --- Читаем правила ---
-                while True:
-                    pat = self.parse_pattern()
-
-                    if pat.name != fun_name:
-                        pass
+                    # Сигнатура
+                    self.eat('(')
+                    f_name, _ = self.eat(expected_type='NAME')
+                    arg_types = []
+                    while self.current()[1] != ')':
+                        arg_types.append(self.parse_type_expr())
+                    self.eat(')')
 
                     self.eat('->')
-                    body = self.parse_expr()
-                    rules.append(Rule(pat, body))
+                    ret_type = self.parse_type_expr()
+                    self.eat(':')
 
-                    if self.current() == '|':
-                        self.eat('|')
-                        continue
-                    elif self.current() == '.':
-                        self.eat('.')
-                        break
-                    else:
-                        raise ValueError(f"Ожидался '|' или '.', получено '{self.current()}'")
+                    sigs.append(FunSig(f_name, arg_types, ret_type, lineno=line))
 
-            else:
-                # Если встретили что-то странное
-                break
+                    # Правила
+                    while True:
+                        pat = self.parse_pattern()
+                        self.eat('->')
+                        body = self.parse_expr()
+                        rules.append(Rule(pat, body, lineno=pat.lineno))
 
-        # Возвращаем программу со всеми данными
+                        sep = self.current()[1]
+                        if sep == '|':
+                            self.eat('|')
+                            continue
+                        elif sep == '.':
+                            self.eat('.')
+                            break
+                        else:
+                            raise ValueError(f"Строка {self.current()[2]}: Ожидался separator (| или .), получено {sep}")
+
+                case _:
+                    raise ValueError(f"Строка {self.current()[2]}: Неожиданный токен верхнего уровня: '{val}'")
+
         return Program(rules, types, sigs)
+
 
 
 def parse(text):
