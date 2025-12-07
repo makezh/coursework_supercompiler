@@ -7,7 +7,7 @@ class Expr:
     """
     Базовый класс для всего, что может быть выражением
     """
-    lineno: int = field(default=0, compare=False, repr=False)
+    pass
 
 
 @dataclass
@@ -16,6 +16,7 @@ class Var(Expr):
     Переменная: просто имя ("x", "xs", "ys" etc.)
     """
     name: str
+    lineno: int = field(default=0, compare=False, repr=False)
 
     def __str__(self):
         return self.name
@@ -30,6 +31,7 @@ class Ctr(Expr):
     """
     name: str
     args: List[Expr]
+    lineno: int = field(default=0, compare=False, repr=False)
 
     def __str__(self):
         # Если аргументов нет, просто [Nil]
@@ -49,6 +51,7 @@ class FCall(Expr):
     """
     name: str
     args: List[Expr]
+    lineno: int = field(default=0, compare=False, repr=False)
 
     def __str__(self):
         # Собираем строку вида (fun_name arg1 arg2)
@@ -59,6 +62,7 @@ class FCall(Expr):
 @dataclass
 class IntLit(Expr):
     value: int
+    lineno: int = field(default=0, compare=False, repr=False)
 
     def __str__(self): return str(self.value)
 
@@ -74,6 +78,7 @@ class Let(Expr):
     var_name: str
     val: Expr
     body: Expr
+    lineno: int = field(default=0, compare=False, repr=False)
 
     def __str__(self):
         return f"let {self.var_name} = {self.val} in {self.body}"
@@ -99,7 +104,7 @@ class ConstrDef:
     """Определение конструктора: Z или S [Nat]"""
     name: str
     arg_types: List[TypeExpr]
-    lineno: int = 0
+    lineno: int = field(default=0, compare=False, repr=False)
 
 
 @dataclass
@@ -108,7 +113,7 @@ class TypeDef:
     name: str
     params: List[str]  # имена типовых переменных, например ['a'] для [List a]
     constructors: List[ConstrDef]
-    lineno: int = 0
+    lineno: int = field(default=0, compare=False, repr=False)
 
 
 @dataclass
@@ -117,7 +122,7 @@ class FunSig:
     name: str
     arg_types: List[TypeExpr]
     ret_type: TypeExpr
-    lineno: int = 0
+    lineno: int = field(default=0, compare=False, repr=False)
 # --- Конец Типов, Сигнатур и Определений ---
 
 
@@ -128,7 +133,7 @@ class FunSig:
 class Pattern:
     name: str  # Имя функции
     params: List[Expr]  # Параметры (там могут быть Var или Ctr)
-    lineno: int = 0
+    lineno: int = field(default=0, compare=False, repr=False)
 
     def __str__(self):
         params_str = " ".join(str(p) for p in self.params)
@@ -146,7 +151,7 @@ class Rule:
     """
     pattern: Pattern
     body: Expr
-    lineno: int = 0
+    lineno: int = field(default=0, compare=False, repr=False)
 
     def __str__(self):
         return f"{self.pattern} -> {self.body}"
