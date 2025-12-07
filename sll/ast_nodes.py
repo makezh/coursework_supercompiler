@@ -7,7 +7,7 @@ class Expr:
     """
     Базовый класс для всего, что может быть выражением
     """
-    pass
+    lineno: int = field(default=0, compare=False, repr=False)
 
 
 @dataclass
@@ -86,6 +86,7 @@ class TypeExpr:
     """Представление типа, например [Nat] или [List [Nat]]"""
     name: str
     params: List['TypeExpr'] = field(default_factory=list)
+    lineno: int = field(default=0, compare=False, repr=False)
 
     def __str__(self):
         if not self.params:
@@ -98,6 +99,7 @@ class ConstrDef:
     """Определение конструктора: Z или S [Nat]"""
     name: str
     arg_types: List[TypeExpr]
+    lineno: int = 0
 
 
 @dataclass
@@ -106,6 +108,7 @@ class TypeDef:
     name: str
     params: List[str]  # имена типовых переменных, например ['a'] для [List a]
     constructors: List[ConstrDef]
+    lineno: int = 0
 
 
 @dataclass
@@ -114,6 +117,7 @@ class FunSig:
     name: str
     arg_types: List[TypeExpr]
     ret_type: TypeExpr
+    lineno: int = 0
 # --- Конец Типов, Сигнатур и Определений ---
 
 
@@ -124,6 +128,7 @@ class FunSig:
 class Pattern:
     name: str  # Имя функции
     params: List[Expr]  # Параметры (там могут быть Var или Ctr)
+    lineno: int = 0
 
     def __str__(self):
         params_str = " ".join(str(p) for p in self.params)
@@ -141,6 +146,7 @@ class Rule:
     """
     pattern: Pattern
     body: Expr
+    lineno: int = 0
 
     def __str__(self):
         return f"{self.pattern} -> {self.body}"
