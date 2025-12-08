@@ -13,7 +13,7 @@ class TypeContext:
         self.functions = {}
 
 
-def types_match(actual: TypeExpr, expected: TypeExpr, ctx: TypeContext) -> bool:
+def types_match(actual: TypeExpr, expected: TypeExpr, ctx: TypeContext, allow_instantiation: bool = False) -> bool:
     """
     Проверяет, подходит ли тип actual под требования expected.
     """
@@ -21,7 +21,9 @@ def types_match(actual: TypeExpr, expected: TypeExpr, ctx: TypeContext) -> bool:
     if expected.name not in ctx.defined_types:
         return True
     if actual.name not in ctx.defined_types:
-        return True
+        if allow_instantiation:
+            return True
+        return False
 
     # Имена должны совпадать (List == List)
     if actual.name != expected.name:
@@ -32,7 +34,7 @@ def types_match(actual: TypeExpr, expected: TypeExpr, ctx: TypeContext) -> bool:
         return False
 
     # Рекурсивно проверяем внутренности
-    return all(types_match(p1, p2, ctx) for p1, p2 in zip(actual.params, expected.params))
+    return all(types_match(p1, p2, ctx, allow_instantiation) for p1, p2 in zip(actual.params, expected.params))
 
 
 def resolve_type(abstract_type: TypeExpr, mapping: dict) -> TypeExpr:
@@ -114,7 +116,7 @@ def check_expr(expr, expected: TypeExpr, ctx: TypeContext, scopes: dict):
                 raise TypeCheckerError(f"Строка {expr.lineno}: Неизвестная переменная '{name}'")
             actual = scopes[name]
             # Проверяем, совпадает ли тип переменной с тем, что мы должны вернуть
-            if not types_match(actual, expected, ctx):
+            if not types_match(actual, expected, ctx, allow_instantiation=False):
                 raise TypeCheckerError(
                     f"Строка {expr.lineno}: Переменная '{name}' имеет тип {actual}, а ожидается {expected}")
 
@@ -152,7 +154,7 @@ def check_expr(expr, expected: TypeExpr, ctx: TypeContext, scopes: dict):
             sig = ctx.functions[name]
 
             # А. Возвращает ли функция то, что нам нужно?
-            if not types_match(sig.ret_type, expected, ctx):
+            if not types_match(sig.ret_type, expected, ctx, allow_instantiation=True):
                 raise TypeCheckerError(
                     f"Строка {expr.lineno}: Функция {name} возвращает {sig.ret_type}, а нужно {expected}")
 
