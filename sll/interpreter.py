@@ -11,55 +11,51 @@ def step(expr, program):
     # СЛУЧАЙ 1: Конструктор (например, [S (add ...)])
     # Сам конструктор не вычисляется, но внутри него могут быть вызовы.
     # Мы пытаемся вычислить аргументы слева направо.
-    if isinstance(expr, Ctr):
-        for i, arg in enumerate(expr.args):
-            # Пробуем сделать шаг в аргументе
-            new_arg = step(arg, program)
-            if new_arg is not None:
-                # Если аргумент изменился, возвращаем обновленный конструктор
-                new_args = list(expr.args)  # Копируем список
-                new_args[i] = new_arg
-                return Ctr(expr.name, new_args)
-        return None  # Если внутри всё чисто (нет вызовов), шаг сделать нельзя
+    match expr:
+        case Ctr(name, args):
+            for i, arg in enumerate(args):
+                new_arg = step(arg, program)
+                if new_arg is not None:
+                    new_args = list(args)
+                    new_args[i] = new_arg
+                    return Ctr(name, new_args, lineno=expr.lineno)
+            return None
 
     # СЛУЧАЙ 2: Вызов функции (например, (add [Z] [Z]))
-    if isinstance(expr, FCall):
-        # Пример: (add (add [Z] [Z]) [Z])
-        # Мы не можем выполнить внешний add, пока не посчитаем внутренний,
-        # потому что паттерн ждет [Z] или [S], а видит (add ...).
+        case FCall(name, args):
+            # ШАГ А: Пытаемся найти правило и применить его
+            rules = [r for r in program.rules if r.pattern.name == name]
 
-        # Поэтому, если первый аргумент - это вызов функции, надо сначала посчитать его.
-        if len(expr.args) > 0 and isinstance(expr.args[0], FCall):
-            new_first_arg = step(expr.args[0], program)
-            if new_first_arg is not None:
-                new_args = list(expr.args)
-                new_args[0] = new_first_arg
-                return FCall(expr.name, new_args)
+            for rule in rules:
+                bindings = {}
+                match_success = True
 
-        rules = []
-        for rule in program.rules:
-            if rule.pattern.name == expr.name:
-                rules.append(rule)
+                # Сопоставляем все аргументы
+                for call_arg, pat_arg in zip(args, rule.pattern.params):
+                    res = match(pat_arg, call_arg)
+                    if res is None:
+                        match_success = False
+                        break
+                    bindings.update(res)
 
-        # Пробегаем по правилам и ищем подходящее
-        for rule in rules:
-            # Собираем общий словарь подстановок для ВСЕХ аргументов
-            all_bindings = {}
-            match_success = True
+                if match_success:
+                    # Нашли правило! Делаем подстановку (rewrite)
+                    return substitute(rule.body, bindings)
 
-            # Сопоставляем каждый аргумент вызова с аргументом паттерна
-            # Вызов: (add [Z] y)
-            # Паттерн: (add [Z] k)
-            for call_arg, pat_arg in zip(expr.args, rule.pattern.params):
-                res = match(pat_arg, call_arg)
-                if res is None:
-                    match_success = False
-                    break
-                all_bindings.update(res)
+            # ШАГ Б: Если правила не подошли, возможно, нам мешает невычисленный аргумент?
+            # Научник просил проверять ВСЕ аргументы, а не только первый.
+            # Ищем первый аргумент, который является вызовом функции, и пробуем его редуцировать.
+            for i, arg in enumerate(args):
+                if isinstance(arg, FCall):
+                    new_arg = step(arg, program)
+                    if new_arg is not None:
+                        # Мы продвинулись внутри аргумента!
+                        # Возвращаем обновленный внешний вызов
+                        new_args = list(args)
+                        new_args[i] = new_arg
+                        return FCall(name, new_args, lineno=expr.lineno)
 
-            if match_success:
-                return substitute(rule.body, all_bindings)
+            return None # Тупик (Normal Form или ошибка)
 
-        return None  # Тупик (нет подходящего правила)
-
-    return None
+        case _:
+            return None
