@@ -106,5 +106,93 @@ class TestInterpreter(unittest.TestCase):
 
         self.assertTrue(str(expr) == "[S [Z]]")
 
+    def test_4_multiple_blocking_args(self):
+        """
+        Тест 4: Два аргумента требуют вычисления.
+        (add (g [Z]) (g [Z]))
+        Интерпретатор должен вычислить сначала первый, потом второй.
+        """
+        code = """
+        type [Nat] : Z | S [Nat].
+        
+        fun (g [Nat]) -> [Nat]:
+            (g x) -> [Z].
+            
+        fun (add [Nat] [Nat]) -> [Nat]:
+            (add [Z] y) -> y.
+        """
+        prog = parse(code)
+
+        # Выражение: (add (g [Z]) (g [Z]))
+        expr = self.parse_expr_helper("(add (g [Z]) (g [Z]))")
+        print(f"\nStart Multiple: {expr}")
+
+        expr = step(expr, prog)
+        print(f"Step 1: {expr}")
+        self.assertTrue(str(expr) == "(add [Z] (g [Z]))")
+
+        expr = step(expr, prog)
+        print(f"Step 2: {expr}")
+        # Тут сработает правило (add [Z] y) -> y, где y = (g [Z])
+        self.assertTrue(str(expr) == "(g [Z])")
+
+        # Шаг 3: Довычисляем остаток
+        expr = step(expr, prog)
+        print(f"Step 3: {expr}")
+        self.assertTrue(str(expr) == "[Z]")
+
+    def test_5_blocking_argument_at_end(self):
+        """
+        Тест 5: Блокирующий вызов стоит последним (3-м) аргументом.
+        Проверяем, что цикл `for` в интерпретаторе доходит до конца.
+        """
+        code = """
+        type [T] : A | B | C | OK.
+        
+        fun (get_c [T]) -> [T]:
+            (get_c x) -> [C].
+            
+        fun (check [T] [T] [T]) -> [T]:
+            (check [A] [B] [C]) -> [OK].
+        """
+        prog = parse(code)
+        expr = self.parse_expr_helper("(check [A] [B] (get_c [A]))")
+
+        expr = step(expr, prog)
+        print(f"\nCheck 3rd arg: {expr}")
+
+        self.assertTrue(str(expr) == "(check [A] [B] [C])")
+
+        expr = step(expr, prog)
+        self.assertTrue(str(expr) == "[OK]")
+
+    def test_6_nested_chain_calls(self):
+        """
+        Тест 6: Цепочка вызовов (f (g (h [Z])))
+        """
+        code = """
+        type [Nat] : Z.
+        fun (h [Nat]) -> [Nat]: (h x) -> [Z].
+        fun (g [Nat]) -> [Nat]: (g [Z]) -> [Z].
+        fun (f [Nat]) -> [Nat]: (f [Z]) -> [Z].
+        """
+        prog = parse(code)
+
+        expr = self.parse_expr_helper("(f (g (h [Z])))")
+
+        print(f"\nStart Chain: {expr}")
+
+        expr = step(expr, prog)
+        print(f"Step 1: {expr}")
+        self.assertTrue(str(expr) == "(f (g [Z]))")
+
+        expr = step(expr, prog)
+        print(f"Step 2: {expr}")
+        self.assertTrue(str(expr) == "(f [Z])")
+
+        expr = step(expr, prog)
+        print(f"Step 3: {expr}")
+        self.assertTrue(str(expr) == "[Z]")
+
 if __name__ == '__main__':
     unittest.main()
