@@ -7,7 +7,7 @@ class Expr:
     """
     Базовый класс для всего, что может быть выражением
     """
-    pass
+    lineno: int = field(default=0, compare=False, repr=False)
 
 
 @dataclass
