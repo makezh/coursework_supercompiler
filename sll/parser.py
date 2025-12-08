@@ -236,6 +236,13 @@ class Parser:
                     self.eat(':')
 
                     constrs = []
+
+                    # ИСПРАВЛЕНИЕ: Проверяем, не пустой ли тип (сразу точка)
+                    if self.current()[1] == '.':
+                         self.eat('.')
+                         types.append(TypeDef(t_name, t_params, [], lineno=line))
+                         continue # Идем к следующему объявлению
+
                     while True:
                         c_name, c_line = self.eat(expected_type='NAME')
                         c_args = []
