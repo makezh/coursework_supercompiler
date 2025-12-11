@@ -50,8 +50,9 @@ def unify(template: TypeExpr, concrete: TypeExpr, mapping: dict, ctx: TypeContex
         # Если мы уже встречали этот дженерик раньше
         if template.name in mapping:
             known_type = mapping[template.name]
-            # Проверяем, что новый тип совпадает со старым.
-            # allow_instantiation=False, потому что 'x' уже зафиксирован - менять нельзя.
+            # Проверяем, что новый тип (concrete) совместим с тем, что мы узнали ранее (known_type).
+            # allow_instantiation=True, чтобы "гибкие" типы ([Nil], результат функции)
+            # могли подстроиться под уже зафиксированный жесткий тип.
             if not types_match(concrete, known_type, ctx, allow_instantiation=True):
                 raise TypeCheckerError(lineno,
                                        f"Конфликт типов для переменной '{template.name}': ожидали {known_type}, получили {concrete}")
@@ -196,67 +197,6 @@ def check_pattern(pat, expected: TypeExpr, ctx: TypeContext, scopes: dict):
 
         case _:
             raise TypeCheckerError(pat.lineno, f"Ошибка в паттерне")
-
-
-def check_expr(expr, expected: TypeExpr, ctx: TypeContext, scopes: dict):
-    match expr:
-        # 1. ПЕРЕМЕННАЯ
-        case Var(name):
-            if name not in scopes:
-                raise TypeCheckerError(expr.lineno, f"Неизвестная переменная '{name}'")
-            actual = scopes[name]
-            # Проверяем, совпадает ли тип переменной с тем, что мы должны вернуть
-            if not types_match(actual, expected, ctx, allow_instantiation=False):
-                raise TypeCheckerError(expr.lineno, f"Переменная '{name}' имеет тип {actual}, а ожидается {expected}")
-
-        # 2. ЧИСЛО
-        case IntLit():
-            if expected.name != 'Int':
-                raise TypeCheckerError(expr.lineno, f"Ожидался тип {expected}, получено число")
-
-        # 3. КОНСТРУКТОР
-        case Ctr(name, args):
-            if name not in ctx.constructors:
-                raise TypeCheckerError(expr.lineno, f"Неизвестный конструктор {name}")
-
-            type_def, c_arg_types = ctx.constructors[name]
-
-            if type_def.name != expected.name:
-                raise TypeCheckerError(expr.lineno, f"{name} создает {type_def.name}, а нужно {expected.name}")
-
-            if len(type_def.params) != len(expected.params):
-                raise TypeCheckerError(expr.lineno, f"Несовпадение параметров типа")
-            mapping = {t_var: t_conc for t_var, t_conc in zip(type_def.params, expected.params)}
-
-            if len(args) != len(c_arg_types):
-                raise TypeCheckerError(expr.lineno, f"Неверное число аргументов у {name}")
-
-            for arg_node, abstract_type in zip(args, c_arg_types):
-                concrete_type = resolve_type(abstract_type, mapping)
-                check_expr(arg_node, concrete_type, ctx, scopes)
-
-        # 4. ВЫЗОВ ФУНКЦИИ
-        case FCall(name, args):
-            if name not in ctx.functions:
-                raise TypeCheckerError(expr.lineno, f"Вызов неизвестной функции {name}")
-
-            sig = ctx.functions[name]
-
-            # А. Возвращает ли функция то, что нам нужно?
-            if not types_match(sig.ret_type, expected, ctx, allow_instantiation=True):
-                raise TypeCheckerError(expr.lineno, f"Функция {name} возвращает {sig.ret_type}, а нужно {expected}")
-
-            # Б. Проверяем количество аргументов
-            if len(args) != len(sig.arg_types):
-                raise TypeCheckerError(expr.lineno, f"Неверное число аргументов у функции {name}")
-
-            # В. Проверяем сами аргументы
-            for arg_node, sig_arg_type in zip(args, sig.arg_types):
-                # Рекурсивно проверяем, что переданный аргумент соответствует сигнатуре функции
-                check_expr(arg_node, sig_arg_type, ctx, scopes)
-
-        case _:
-            raise TypeCheckerError(expr.lineno, f"Неизвестное выражение")
 
 
 def check_program(prog: Program):
