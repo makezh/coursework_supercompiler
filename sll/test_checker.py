@@ -110,7 +110,73 @@ class TestTypeChecker(unittest.TestCase):
         # Проверяем, что ошибка именно про несовпадение типов
         err_msg = str(cm.exception)
         print(f"   Поймана ошибка: {err_msg}")
-        self.assertTrue("имеет тип" in err_msg or "не совпадает" in err_msg)
+        self.assertTrue("Несовпадение типов" in err_msg)
+
+    def test_03a_deep_nesting_mismatch(self):
+        """
+        Ошибка: передаём в функцию неправильные аргументы…
+        """
+        code = """
+        type [List x]: Cons x [List x] | Nil.
+        type [Bool]: True | False.
+        type [TriBool]: True3 | False3 | X3.
+        type [Int]: .
+
+        fun (append [List x] [List x]) -> [List x]:
+
+        (append [Cons x xs] ys) -> [Cons x (append xs ys)] |
+        (append [Nil] ys) -> ys.
+            
+        fun (bad_call) -> [List Int]:
+            << ОШИБКА: x имеет тип 'x' (элемент), а flat ждет список списков >>
+            (bad_call) ->
+                (append
+                    (append
+                        [Cons [True] [Cons [False] [Nil]]]
+                        [Cons 1 [Cons 2 [Nil]]]
+                    )
+                    [Cons [True3] [Cons [X3] [Cons [False3] [Nil]]]]
+                ). 
+        """
+        print("\n🔎 Тест 3a: Ошибка соответствия типов…")
+        with self.assertRaises(TypeCheckerError) as cm:
+            self.check(code)
+
+        # Проверяем, что ошибка именно про несовпадение типов
+        err_msg = str(cm.exception)
+        print(f"   Поймана ошибка: {err_msg}")
+        self.assertTrue("Конфликт типов" in err_msg)
+
+    def test_03b_deep_nesting_match(self):
+        """
+        Нет ошибки: передаём в функцию правильные аргументы…
+        """
+        code = """
+        type [List x]: Cons x [List x] | Nil.
+        type [Bool]: True | False.
+
+        fun (append [List x] [List x]) -> [List x]:
+
+        (append [Cons x xs] ys) -> [Cons x (append xs ys)] |
+        (append [Nil] ys) -> ys.
+            
+        fun (good_call) -> [List Bool]:
+            (good_call) ->
+                (append
+                    (append
+                        [Cons [True] [Cons [False] [Nil]]]
+                        [Cons [True] [Cons [False] [Nil]]]
+                    )
+                    [Cons [True] [Cons [False] [Nil]]]
+                ). 
+        """
+        print("\n🔎 Тест 3b: Правильный пример соответствия типов…")
+        try:
+            self.check(code)
+            print("✅ Успех! Сложные вложенные типы работают корректно.")
+        except TypeCheckerError as e:
+            self.fail(f"Пример упал с ошибкой: {e}")
+
 
     def test_04_generic_concrete_mismatch(self):
         """
@@ -165,7 +231,7 @@ class TestTypeChecker(unittest.TestCase):
         with self.assertRaises(TypeCheckerError) as cm:
             self.check(code)
         print(f"   Поймана ошибка: {cm.exception}")
-        self.assertIn("Ожидался", str(cm.exception))
+        self.assertIn("должна возвращать", str(cm.exception))
 
     def test_07_constructor_arity_mismatch(self):
         """
@@ -199,7 +265,7 @@ class TestTypeChecker(unittest.TestCase):
         with self.assertRaises(TypeCheckerError) as cm:
             self.check(code)
         print(f"   Поймана ошибка: {cm.exception}")
-        self.assertIn("Неверное число аргументов", str(cm.exception))
+        self.assertIn("ждет 2 аргументов", str(cm.exception))
 
 if __name__ == '__main__':
     unittest.main()
