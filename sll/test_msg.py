@@ -1,0 +1,72 @@
+import unittest
+from sll.parser import parse, Parser, tokenize
+from sll.msg import msg
+from sll.ast_nodes import Var
+
+class TestMSG(unittest.TestCase):
+
+    def _expr(self, text):
+        return Parser(tokenize(text)).parse_expr()
+
+    def test_identical(self):
+        """Если выражения одинаковы -> Обобщение такое же"""
+        t1 = self._expr("[S [Z]]")
+        t2 = self._expr("[S [Z]]")
+
+        res = msg(t1, t2)
+        self.assertEqual(str(res.gen), "[S [Z]]")
+        self.assertEqual(res.sub1, {})
+        self.assertEqual(res.sub2, {})
+
+    def test_simple_conflict(self):
+        """Разные корни -> Переменная"""
+        t1 = self._expr("[Z]")
+        t2 = self._expr("[S x]")
+
+        res = msg(t1, t2)
+        # Ожидаем: v1
+        self.assertIsInstance(res.gen, Var)
+        self.assertEqual(res.gen.name, "v1")
+
+        # sub1: v1 -> [Z]
+        self.assertEqual(str(res.sub1["v1"]), "[Z]")
+        # sub2: v1 -> [S x]
+        self.assertEqual(str(res.sub2["v1"]), "[S x]")
+
+    def test_common_structure(self):
+        """Совпадение сверху, различие внутри"""
+        # t1: [Cons [Z] xs]
+        # t2: [Cons [S x] xs]
+        # MSG: [Cons v1 xs]  <-- v1 заменила различие ([Z] и [S x])
+
+        t1 = self._expr("[Cons [Z] xs]")
+        t2 = self._expr("[Cons [S x] xs]")
+
+        res = msg(t1, t2)
+
+        # Проверяем структуру
+        self.assertEqual(str(res.gen), "[Cons v1 xs]")
+
+        # Проверяем подстановки
+        # v1 -> [Z]
+        self.assertEqual(str(res.sub1["v1"]), "[Z]")
+        # v1 -> [S x]
+        self.assertEqual(str(res.sub2["v1"]), "[S x]")
+
+    def test_double_conflict(self):
+        """Два различия в разных местах"""
+        # t1: f(A, B)
+        # t2: f(C, D)
+        # MSG: f(v1, v2)
+
+        t1 = self._expr("(f [A] [B])")
+        t2 = self._expr("(f [C] [D])")
+
+        res = msg(t1, t2)
+        self.assertEqual(str(res.gen), "(f v1 v2)")
+
+        self.assertEqual(str(res.sub1["v1"]), "[A]")
+        self.assertEqual(str(res.sub1["v2"]), "[B]")
+
+if __name__ == '__main__':
+    unittest.main()
