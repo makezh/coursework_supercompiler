@@ -1,5 +1,5 @@
 import unittest
-from sll.ast_nodes import Var, Ctr, IntLit
+from sll.ast_nodes import Var, Ctr, IntLit, FCall
 from sll.matching import match
 
 class TestMatching(unittest.TestCase):
@@ -91,6 +91,43 @@ class TestMatching(unittest.TestCase):
         self.assertIsNone(match(pat, arg_fail))
         
         print("✅ Тест 5 (Int inside Ctr) прошел")
+
+    def test_6_function_call_match(self):
+        """Тест 6: Сопоставление вызовов функций (FCall)"""
+        # Паттерн: (add x y)
+        var_y = Var("y")
+        pat = FCall("add", [self.var_x, var_y])
+
+        # Случай А: Успешное совпадение. (add [Z] [S x])
+        # Это имитирует проверку: является ли (add [Z] [S x]) частным случаем (add x y)
+        arg_ok = FCall("add", [self.z, Ctr("S", [self.var_x])])
+
+        res = match(pat, arg_ok)
+        self.assertIsNotNone(res)
+        # x -> [Z]
+        self.assertEqual(str(res['x']), "[Z]")
+        # y -> [S x]
+        self.assertIn("S", str(res['y']))
+
+        # Случай Б: Не совпало имя функции (mult vs add)
+        arg_fail_name = FCall("mult", [self.z, self.z])
+        self.assertIsNone(match(pat, arg_fail_name))
+
+        # Случай В: Не совпало количество аргументов
+        arg_fail_arity = FCall("add", [self.z])
+        self.assertIsNone(match(pat, arg_fail_arity))
+
+        # Случай Г: Вложенные вызовы
+        # Паттерн: (g (f x))
+        # Аргумент: (g (f [Z]))
+        pat_nested = FCall("g", [FCall("f", [self.var_x])])
+        arg_nested = FCall("g", [FCall("f", [self.z])])
+
+        res_nested = match(pat_nested, arg_nested)
+        self.assertIsNotNone(res_nested)
+        self.assertEqual(str(res_nested['x']), "[Z]")
+
+        print("✅ Тест 6 (FCall) прошел")
 
 if __name__ == '__main__':
     unittest.main()

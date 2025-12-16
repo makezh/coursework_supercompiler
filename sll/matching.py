@@ -38,6 +38,22 @@ def match(pattern_arg, call_arg):
                     # Если ждали конструктор, а пришел вызов функции или число
                     return None
 
+        # 4. Вызов функции
+        # Нужно, чтобы понять, что add(a, b) — это предок для add(v1, b)
+        case FCall(p_name, p_args):
+            match call_arg:
+                # Структурно вызов функции матчится так же, как конструктор
+                case FCall(c_name, c_args) if p_name == c_name and len(p_args) == len(c_args):
+                    bindings = {}
+                    for p_sub, c_sub in zip(p_args, c_args):
+                        res = match(p_sub, c_sub)
+                        if res is None:
+                            return None
+                        bindings.update(res)
+                    return bindings
+                case _:
+                    return None
+
         case _:
             return None
 
