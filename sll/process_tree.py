@@ -12,7 +12,7 @@ class Contraction:
     var_name: str
     pattern: Pattern
 
-@dataclass
+@dataclass(eq=False)
 class Node:
     """
     Узел дерева суперкомпиляции.
