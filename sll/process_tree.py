@@ -24,6 +24,9 @@ class Node:
     # Мета-информация о том, как мы сюда попали
     contraction: Optional[Contraction] = None
 
+    # Ссылка назад (для сворачивания графа)
+    back_link: Optional['Node'] = None
+
     def add_child(self, node: 'Node', contraction: Optional[Contraction] = None):
         node.parent = self
         node.contraction = contraction
@@ -35,6 +38,8 @@ class Node:
 
     def leaves(self) -> List['Node']:
         """Возвращает список всех листьев (необработанных узлов) в поддереве"""
+        if self.back_link:
+            return [] # Если узел свернут, он не лист
         if not self.children:
             return [self]
         res = []
