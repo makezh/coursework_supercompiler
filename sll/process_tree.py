@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
-from sll.ast_nodes import Expr, Pattern
+from typing import List, Optional, Tuple, Dict
+from sll.ast_nodes import Expr, Pattern, TypeExpr
+
 
 @dataclass
 class Contraction:
@@ -18,6 +19,10 @@ class Node:
     Узел дерева суперкомпиляции.
     """
     expr: Expr                          # Выражение в текущем состоянии
+
+    # Словарь: имя переменной -> выражение типа
+    var_types: Dict[str, TypeExpr]
+
     parent: Optional['Node'] = None     # Родитель (Корень - None)
     children: List['Node'] = field(default_factory=list)
 
@@ -34,7 +39,8 @@ class Node:
         return node
 
     def __str__(self):
-        return f"Node({self.expr})"
+        types_str = ", ".join(f"{k}:{v.name}" for k, v in self.var_types.items())
+        return f"Node({self.expr}) {{{types_str}}}"
 
     def leaves(self) -> List['Node']:
         """Возвращает список всех листьев (необработанных узлов) в поддереве"""
