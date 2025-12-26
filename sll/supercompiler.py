@@ -1,4 +1,6 @@
-from sll.ast_nodes import Program, Expr, FCall
+from typing import Dict
+
+from sll.ast_nodes import Program, Expr, FCall, TypeExpr
 from sll.he import he
 from sll.msg import msg
 from sll.process_tree import Node, Contraction
@@ -21,20 +23,28 @@ def _find_embedding_ancestor(node: Node) -> Node | None:
     return None
 
 
-def _is_renaming(t1: Expr, t2: Expr) -> bool:
-    """
-    Проверяет, является ли t1 переименованием t2.
-    Эквивалентно: t1 <= t2 И t2 <= t1.
-    """
-    return (match(t2, t1) is not None) and (match(t1, t2) is not None)
-
-
 def _find_renaming_ancestor(node: Node) -> Node | None:
     """Ищет предка, который совпадает с точностью до переименования."""
     for alpha in node.ancestors():
         if _is_renaming(node.expr, alpha.expr):
             return alpha
     return None
+
+
+def _remove_children_from_unprocessed(node: Node, unprocessed: list):
+    """Рекурсивно удаляет потомков узла из очереди обработки."""
+    for child in node.children:
+        if child in unprocessed:
+            unprocessed.remove(child)
+        _remove_children_from_unprocessed(child, unprocessed)
+
+
+def _is_renaming(t1: Expr, t2: Expr) -> bool:
+    """
+    Проверяет, является ли t1 переименованием t2.
+    Эквивалентно: t1 <= t2 И t2 <= t1.
+    """
+    return (match(t2, t1) is not None) and (match(t1, t2) is not None)
 
 
 def _generalize(alpha: Node, beta: Node, unprocessed: list):
@@ -50,9 +60,18 @@ def _generalize(alpha: Node, beta: Node, unprocessed: list):
     # res.gen - обобщенное выражение (с переменными v1, v2...)
     # res.sub1 - как получить alpha из gen (v1 -> expr1, ...)
 
+    # Если обобщенное выражение совпадает с предком (с точностью до имен),
+    # то нет смысла перестраивать дерево. Это просто цикл.
+    if _is_renaming(alpha.expr, res.gen):
+        # C' === C1
+        # Превращаем это в свертку (Folding)
+        beta.back_link = alpha
+        return
+
     # 2. Обновляем узел alpha
     # print(f"GENERALIZATION: {alpha.expr} AND {beta.expr} -> {res.gen}")
     alpha.expr = res.gen
+    _remove_children_from_unprocessed(alpha, unprocessed)
     alpha.children = []  # Очищаем историю (забываем путь, который привел к beta)
     alpha.back_link = None
 
@@ -82,9 +101,9 @@ class Supercompiler:
         self.driver = Driver(program)
         self.tree = None
 
-    def build_tree(self, start_expr: Expr):
+    def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr]):
         """Строит дерево процессов для заданного выражения."""
-        self.tree = Node(start_expr)
+        self.tree = Node(start_expr, var_types=start_var_types)
 
         # Очередь необработанных узлов
         unprocessed = [self.tree]
