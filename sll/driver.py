@@ -99,3 +99,28 @@ class Driver:
                         return True # G
 
         return False # F
+
+    def _try_reduce(self, expr: FCall) -> Optional[Expr]:
+        """
+        Функция пытается выполнить один шаг редукции.
+        Возвращает новое выражение или None, если правило не нашлось.
+        """
+        for rule in self.program.rules:
+            if rule.pattern.name == expr.name:
+                # Пытаемся сопоставить аргументы вызова с паттерном правила
+                full_bindings = {}
+                is_match = True
+
+                # Обрабатываем несколько аргументов
+                for p_arg, call_arg in zip(rule.pattern.params, expr.args):
+                    res = match_term(p_arg, call_arg)
+                    if res is None:
+                        is_match = False
+                        break
+                    full_bindings.update(res)
+
+                if is_match:
+                    # Делаем подстановку в правую часть.
+                    return substitute(rule.body, full_bindings)
+
+        return None
