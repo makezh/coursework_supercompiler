@@ -20,14 +20,16 @@ def he(t1: Expr, t2: Expr) -> bool:
 
         # Сочетание (Coupling) для Конструкторов
         # Имена совпадают, арность совпадает -> проверяем аргументы попарно
-        case (Ctr(n1, args1), Ctr(n2, args2)) if n1 == n2 and len(args1) == len(args2):
+        case (Ctr(n1, args1), Ctr(n2, args2)) if n1 == n2:
+            assert len(args1) == len(args2), f"Арность конструктора {n1} не совпадает: {len(args1)} vs {len(args2)}"
             # Проверяем: a1 <| b1 И a2 <| b2 ...
             if all(he(a, b) for a, b in zip(args1, args2)):
                 return True
 
         # Сочетание (Coupling) для Функций
         # g(a) <| g(b)
-        case (FCall(n1, args1), FCall(n2, args2)) if n1 == n2 and len(args1) == len(args2):
+        case (FCall(n1, args1), FCall(n2, args2)) if n1 == n2:
+            assert len(args1) == len(args2), f"Арность функции {n1} не совпадает!"
             if all(he(a, b) for a, b in zip(args1, args2)):
                 return True
 
