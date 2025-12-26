@@ -35,10 +35,12 @@ class MSGBuilder:
         # 2. Если Корни совпадают (Конструктор или Функция)
         # C(a...) vs C(b...)
         match (t1, t2):
-            case (Ctr(n1, args1), Ctr(n2, args2)) if n1 == n2 and len(args1) == len(args2):
+            case (Ctr(n1, args1), Ctr(n2, args2)) if n1 == n2:
+                assert len(args1) == len(args2), f"Арность конструктора {n1} не совпадает!"
                 return self._merge_args(n1, args1, args2, is_ctr=True)
 
-            case (FCall(n1, args1), FCall(n2, args2)) if n1 == n2 and len(args1) == len(args2):
+            case (FCall(n1, args1), FCall(n2, args2)) if n1 == n2:
+                assert len(args1) == len(args2), f"Арность функции {n1} не совпадает!"
                 return self._merge_args(n1, args1, args2, is_ctr=False)
 
             # Литералы (числа)
