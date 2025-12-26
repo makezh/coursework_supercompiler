@@ -86,3 +86,16 @@ class Driver:
 
     def _drive_call(self, expr: FCall, var_types: Dict[str, TypeExpr]) -> DriveStep:
         return StopStep()
+
+    def _is_g_function(self, name: str) -> bool:
+        """
+        Функция смотрит в правила функции и выясняет, 'любопытная' она (G) или нет (F)
+        """
+        # Бежим по правилам в программе (add, sub, mul...)
+        for rule in self.program.rules:
+            if rule.pattern.name == name:
+                if rule.pattern.params: # Если аргументы вообще есть
+                    if isinstance(rule.pattern.params[0], Ctr):
+                        return True # G
+
+        return False # F
