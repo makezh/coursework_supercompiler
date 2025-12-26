@@ -2,32 +2,41 @@ from dataclasses import dataclass
 from typing import Dict, Tuple
 from sll.ast_nodes import Expr, Var, Ctr, FCall, IntLit
 
+# Тип для ключа переменной: ('v', 10)
+VarKey = Tuple[str, int]
+
+
 @dataclass
 class GenResult:
     """
     Результат обобщения:
     gen: Обобщенное выражение (паттерн с дырками)
+
     sub1: Словарь замен, чтобы получить исходное выражение 1
+    Пример: { ('v', 1): [Z], ('v', 2): [S x] ... }
+
     sub2: Словарь замен, чтобы получить исходное выражение 2
     """
     gen: Expr
-    sub1: Dict[str, Expr]
-    sub2: Dict[str, Expr]
+    sub1: Dict[VarKey, Expr]
+    sub2: Dict[VarKey, Expr]
+
 
 class MSGBuilder:
     def __init__(self):
         self.counter = 0
 
-    def _fresh_var(self) -> str:
+    def _fresh_var_key(self) -> VarKey:
+        """Возвращает кортеж ('v', номер), который идеально сортируется."""
         self.counter += 1
-        return f"v{self.counter}"
+        return "v", self.counter
 
     def generalize(self, t1: Expr, t2: Expr) -> GenResult:
         self.counter = 0
         gen, s1, s2 = self._gen_recursive(t1, t2)
         return GenResult(gen, s1, s2)
 
-    def _gen_recursive(self, t1: Expr, t2: Expr) -> Tuple[Expr, Dict[str, Expr], Dict[str, Expr]]:
+    def _gen_recursive(self, t1: Expr, t2: Expr) -> Tuple[Expr, Dict[VarKey, Expr], Dict[VarKey, Expr]]:
         # 1. Если это ОДИНАКОВЫЕ переменные
         if isinstance(t1, Var) and isinstance(t2, Var) and t1.name == t2.name:
             return t1, {}, {}
@@ -50,10 +59,11 @@ class MSGBuilder:
             case _:
                 # 3. Если корни РАЗНЫЕ — это конфликт.
                 # Создаем общую переменную-дырку.
-                # t1=A, t2=B  --->  gen=v, sub1={v:A}, sub2={v:B}
-                new_var_name = self._fresh_var()
-                new_var = Var(new_var_name)
-                return new_var, {new_var_name: t1}, {new_var_name: t2}
+                key = self._fresh_var_key()
+                name_str = f"{key[0]}{key[1]}"
+                new_var = Var(name_str)
+
+                return new_var, {key: t1}, {key: t2}
 
     def _merge_args(self, name: str, args1: list, args2: list, is_ctr: bool):
         """
@@ -73,6 +83,7 @@ class MSGBuilder:
             return Ctr(name, new_args), full_s1, full_s2
         else:
             return FCall(name, new_args), full_s1, full_s2
+
 
 def msg(t1: Expr, t2: Expr) -> GenResult:
     """Удобная обертка для вызова"""

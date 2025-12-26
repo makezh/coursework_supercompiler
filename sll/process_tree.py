@@ -11,7 +11,7 @@ class Contraction:
     Пример: var_name='x', pattern=[S v1]
     """
     var_name: str
-    pattern: Pattern
+    pattern: Optional[Pattern]
 
 @dataclass(eq=False)
 class Node:

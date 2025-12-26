@@ -59,12 +59,14 @@ def _generalize(alpha: Node, beta: Node, unprocessed: list):
     # 3. Создаем новых детей для alpha из подстановки
     # Важно сохранить порядок переменных, чтобы потом правильно генерировать код.
     # msg генерирует v1, v2... по порядку.
-    sorted_vars = sorted(res.sub1.keys())  # ['v1', 'v2']
+    sorted_keys = sorted(res.sub1.keys())  # [('v', 1), ('v', 2)]
 
-    for v_name in sorted_vars:
-        val_expr = res.sub1[v_name]
+    for key in sorted_keys:
+        val_expr = res.sub1[key]
+
+        v_name = f"{key[0]}{key[1]}"
         # Создаем ребенка.
-        child = Node(val_expr)
+        child = Node(val_expr, var_types=alpha.var_types.copy())
 
         # Используем поле contraction, чтобы запомнить имя переменной let-связывания
         # (var_name='v1', pattern=None)
