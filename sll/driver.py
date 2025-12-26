@@ -124,3 +124,57 @@ class Driver:
                     return substitute(rule.body, full_bindings)
 
         return None
+
+    def _drive_variable(self, expr: FCall, var_name: str, var_types: Dict[str, TypeExpr]) -> DriveStep:
+        """
+        Разгоняем вызов функции по переменной var_name.
+        """
+        # Проверяем, знаем ли мы тип этой переменной
+        if var_name not in var_types:
+            return StopStep()
+
+        type_expr = var_types[var_name]
+        type_name = type_expr.name
+
+        # Ищем определение типа в программе (type Nat : Z | S Nat)
+        if type_name not in self.type_map:
+            return StopStep()
+
+        type_def = self.type_map[type_name]
+
+        branches = []
+
+        # Пробегаем по всем конструкторам типа
+        for constr in type_def.constructors:
+            fresh_vars = []
+            # Копируем таблицу типов - добавляем туда новые переменные для этой ветки
+            new_branch_types = var_types.copy()
+
+            for arg_type in constr.arg_types:
+                # Генерируем уникальное имя (v1, v2...)
+                new_var_name = self.name_gen.fresh_var()
+                fresh_var = Var(new_var_name)
+                fresh_vars.append(fresh_var)
+
+                # Записываем тип новой переменной!
+                new_branch_types[new_var_name] = arg_type
+
+        # Создаем конструктор с новыми переменными: [S v1]
+            fresh_ctr = Ctr(constr.name, fresh_vars)
+
+            # Подставляем: было g(x), стало g([S v1])
+            bindings = {var_name: fresh_ctr}
+            new_expr = substitute(expr, bindings)
+
+            # Пытаемся сразу вычислить (Transient Step)
+            reduced_expr = self._try_reduce(new_expr)
+
+            # Если не раскроется (частичная функция) — оставляем как есть (new_expr)
+            final_expr = reduced_expr if reduced_expr else new_expr
+
+            # Записываем эту ветку
+            contraction = Contraction(var_name, Pattern(fresh_ctr.name, fresh_vars))
+            branches.append((final_expr, contraction, new_branch_types))
+
+        # Возвращаем все найденные варианты
+        return VariantStep(branches=branches)
