@@ -117,8 +117,8 @@ class Supercompiler:
             self._drive_node(beta, unprocessed)
 
     def _drive_node(self, node: Node, unprocessed: list):
-        """Выполняет шаг драйвинга и добавляет детей в дерево."""
-        step = self.driver.drive(node.expr)
+        """Выполняет шаг прогонки и добавляет детей в дерево."""
+        step = self.driver.drive(node.expr, node.var_types)
 
         new_children = []
         match step:
@@ -126,19 +126,19 @@ class Supercompiler:
                 pass  # Лист
 
             case TransientStep(next_expr):
-                child = Node(next_expr)
+                child = Node(next_expr, var_types=node.var_types.copy())
                 node.add_child(child)
                 new_children.append(child)
 
             case DecomposeStep(parts):
                 for part in parts:
-                    child = Node(part)
+                    child = Node(part, var_types=node.var_types.copy())
                     node.add_child(child)
                     new_children.append(child)
 
             case VariantStep(branches):
-                for expr_branch, contraction in branches:
-                    child = Node(expr_branch)
+                for expr_branch, contraction, branch_types in branches:
+                    child = Node(expr_branch, var_types=branch_types)
                     node.add_child(child, contraction)
                     new_children.append(child)
 
