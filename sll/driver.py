@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
 
 from sll.ast_nodes import Expr, Var, Ctr, FCall, Program, Pattern, IntLit, TypeExpr
-from sll.matching import match as match_term, substitute  # Переименовал match, чтобы не путать с match/case
+from sll.matching import match as match_term, substitute, \
+    MatchSuccess, MatchNarrowing, MatchFail  # Переименовал match, чтобы не путать с match/case
 from sll.process_tree import Contraction
 
 
@@ -32,18 +33,22 @@ class NameGen:
 @dataclass
 class DriveStep: pass
 
+
 @dataclass
 class TransientStep(DriveStep):
     next_expr: Expr
+
 
 @dataclass
 class DecomposeStep(DriveStep):
     parts: List[Expr]
 
+
 @dataclass
 class VariantStep(DriveStep):
     # Возвращаем не только выражение ветки, но и новые типы для нее
     branches: List[Tuple[Expr, Contraction, Dict[str, TypeExpr]]]
+
 
 @dataclass
 class StopStep(DriveStep):
@@ -77,7 +82,7 @@ class Driver:
                 return StopStep()
 
             # 3. Вызов функции
-            case FCall(name, args):
+            case FCall(_, _):
                 # Здесь будет основная логика (Transient / Variant / Nested)
                 return self._drive_call(expr, var_types)
 
@@ -85,96 +90,140 @@ class Driver:
                 return StopStep()
 
     def _drive_call(self, expr: FCall, var_types: Dict[str, TypeExpr]) -> DriveStep:
-        return StopStep()
-
-    def _is_g_function(self, name: str) -> bool:
         """
-        Функция смотрит в правила функции и выясняет, 'любопытная' она (G) или нет (F)
+        Rule-Based Driving для вызова функции.
+        Перебирает правила и смотрит, что применимо.
         """
-        # Бежим по правилам в программе (add, sub, mul...)
-        for rule in self.program.rules:
-            if rule.pattern.name == name:
-                if rule.pattern.params: # Если аргументы вообще есть
-                    if isinstance(rule.pattern.params[0], Ctr):
-                        return True # G
+        branches = []
 
-        return False # F
+        # 1. Ищем правила для этой функции
+        rules = [r for r in self.program.rules if r.pattern.name == expr.name]
 
-    def _try_reduce(self, expr: FCall) -> Optional[Expr]:
-        """
-        Функция пытается выполнить один шаг редукции.
-        Возвращает новое выражение или None, если правило не нашлось.
-        """
-        for rule in self.program.rules:
-            if rule.pattern.name == expr.name:
-                # Пытаемся сопоставить аргументы вызова с паттерном правила
-                full_bindings = {}
-                is_match = True
+        for rule in rules:
+            # Пытаемся сопоставить аргументы вызова с паттерном правила
 
-                # Обрабатываем несколько аргументов
-                for p_arg, call_arg in zip(rule.pattern.params, expr.args):
-                    res = match_term(p_arg, call_arg)
-                    if res is None:
-                        is_match = False
-                        break
-                    full_bindings.update(res)
+            # Cоздаем фиктивные FCall, чтобы использовать логику match для списка аргументов
+            pat_dummy = FCall("dummy", rule.pattern.params)
+            call_dummy = FCall("dummy", expr.args)
 
-                if is_match:
+            res = match_term(pat_dummy, call_dummy)
+
+            match res:
+                # Полное совпадение -> Редукция
+                case MatchSuccess(bindings):
                     # Делаем подстановку в правую часть.
-                    return substitute(rule.body, full_bindings)
+                    new_expr = substitute(rule.body, bindings)
+                    return TransientStep(next_expr=new_expr)
 
-        return None
+                # Сужение -> Кандидат на ветвление
+                case MatchNarrowing(var_name, constr_name, _):
+                    # Нашли переменную для сужения
+                    branch = self._create_branch(expr, var_name, constr_name, var_types)
+                    if branch:
+                        branches.append(branch)
 
-    def _drive_variable(self, expr: FCall, var_name: str, var_types: Dict[str, TypeExpr]) -> DriveStep:
+                case MatchFail():
+                    # Ничего не подходит, пробуем следующее правило
+                    continue
+
+        # Если есть ветвления, возвращаем их
+        if branches:
+            return VariantStep(branches=branches)
+
+        # Если веток нет, значит нам мешает вложенный вызов —
+        # Ищем первый вложенный вызов и прогоняем его
+        return self._drive_nested(expr, var_types)
+
+    def _create_branch(self, expr: FCall, var_name: str, constr_name: str, var_types: Dict[str, TypeExpr]) -> Optional[
+        Tuple[Expr, Contraction, Dict[str, TypeExpr]]]:
         """
-        Разгоняем вызов функции по переменной var_name.
+        Создает одну ветку для VariantStep.
+        заменяет переменную var_name в expr на конструктор constr_name с новыми переменными.
         """
-        # Проверяем, знаем ли мы тип этой переменной
+
+        # Находим тип переменной
         if var_name not in var_types:
-            return StopStep()
+            return None  # Переменная не имеет типа
 
-        type_expr = var_types[var_name]
-        type_name = type_expr.name
-
-        # Ищем определение типа в программе (type Nat : Z | S Nat)
+        type_name = var_types[var_name].name
         if type_name not in self.type_map:
-            return StopStep()
+            return None  # Неизвестный тип
 
         type_def = self.type_map[type_name]
 
-        branches = []
+        # Находим конструктор в типе
+        constr_def = next((c for c in type_def.constructors if c.name == constr_name), None)
+        if not constr_def:
+            return None  # Неизвестный конструктор
 
-        # Пробегаем по всем конструкторам типа
-        for constr in type_def.constructors:
-            fresh_vars = []
-            # Копируем таблицу типов - добавляем туда новые переменные для этой ветки
-            new_branch_types = var_types.copy()
+        # Создаем новые переменные для аргументов конструктора
+        fresh_vars = []
+        new_branch_types = var_types.copy()
 
-            for arg_type in constr.arg_types:
-                # Генерируем уникальное имя (v1, v2...)
-                new_var_name = self.name_gen.fresh_var()
-                fresh_var = Var(new_var_name)
-                fresh_vars.append(fresh_var)
+        for arg_type in constr_def.arg_types:
+            v = Var(self.name_gen.fresh_var())
+            fresh_vars.append(v)
+            new_branch_types[v.name] = arg_type
 
-                # Записываем тип новой переменной!
-                new_branch_types[new_var_name] = arg_type
+        # Создаем новый конструктор с этими переменными
+        fresh_ctr = Ctr(constr_name, fresh_vars)
+        bindings = {var_name: fresh_ctr}
 
-        # Создаем конструктор с новыми переменными: [S v1]
-            fresh_ctr = Ctr(constr.name, fresh_vars)
+        # Делаем подстановку в исходное выражение
+        new_expr = substitute(expr, bindings)
 
-            # Подставляем: было g(x), стало g([S v1])
-            bindings = {var_name: fresh_ctr}
-            new_expr = substitute(expr, bindings)
+        # 4. Пытаемся сразу редуцировать (Transient Step)
+        # f([Z]) -> body
+        # Для этого нам нужно снова вызвать match (упрощенно) или рекурсивно _drive_call.
+        # Но чтобы не усложнять, мы просто вернем new_expr.
+        # На СЛЕДУЮЩЕМ шаге драйвер увидит f([Z]) и сделает TransientStep.
+        # (Так работает SPSC Lite).
 
-            # Пытаемся сразу вычислить (Transient Step)
-            reduced_expr = self._try_reduce(new_expr)
+        # Но чтобы было красиво, попробуем редуцировать здесь:
+        final_expr = new_expr
+        # Ищем правило, которое теперь точно подойдет
+        for rule in self.program.rules:
+            if rule.pattern.name == expr.name:
+                pat_dummy = FCall("dummy", rule.pattern.params)
+                call_dummy = FCall("dummy", new_expr.args)  # Аргументы уже новые
+                if isinstance(match_term(pat_dummy, call_dummy), MatchSuccess):
+                    match_res = match_term(pat_dummy, call_dummy)  # Получаем bindings
+                    final_expr = substitute(rule.body, match_res.bindings)
+                    break
 
-            # Если не раскроется (частичная функция) — оставляем как есть (new_expr)
-            final_expr = reduced_expr if reduced_expr else new_expr
+        contraction = Contraction(var_name, Pattern(constr_name, fresh_vars))
+        return final_expr, contraction, new_branch_types
 
-            # Записываем эту ветку
-            contraction = Contraction(var_name, Pattern(fresh_ctr.name, fresh_vars))
-            branches.append((final_expr, contraction, new_branch_types))
 
-        # Возвращаем все найденные варианты
-        return VariantStep(branches=branches)
+    def _drive_nested(self, expr: FCall, var_types: Dict[str, TypeExpr]) -> DriveStep:
+        """
+        Ищет первый вложенный вызов функции в аргументах expr и прогоняет его через драйвер.
+        Возвращает TransientStep с обновленным выражением.
+        """
+        for i, arg in enumerate(expr.args):
+            if isinstance(arg, FCall):
+                inner_step = self.drive(arg, var_types)
+
+                match inner_step:
+                    case TransientStep(next_expr=nested_next):
+                        # Обновляем аргумент и возвращаем новый вызов
+                        new_args = list(expr.args)
+                        new_args[i] = nested_next
+                        new_expr = FCall(expr.name, new_args, lineno=expr.lineno)
+                        return TransientStep(next_expr=new_expr)
+
+                    case VariantStep(branches):
+                        # Выносим ветвление наружу
+                        new_branches = []
+                        for branch_expr, contraction, branch_var_types in branches:
+                            new_args = list(expr.args)
+                            new_args[i] = branch_expr
+                            new_call = FCall(expr.name, new_args, lineno=expr.lineno)
+                            new_branches.append((new_call, contraction, branch_var_types))
+                        return VariantStep(branches=new_branches)
+
+                    case _:
+                        pass
+
+        # Если не нашли вложенных вызовов для продвижения, останавливаемся
+        return StopStep()
