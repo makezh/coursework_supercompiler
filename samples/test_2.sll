@@ -1,0 +1,20 @@
+type [Nat] : Z | S [Nat] .
+type [Bool] : True | False .
+
+<< 1. Классическое сложение (add) >>
+fun (add [Nat] [Nat]) -> [Nat] :
+    (add [Z] y) -> y
+  | (add [S x] y) -> [S (add x y)] .
+
+<< 2. Сложение с аккумулятором (addAcc) >>
+<< Это "плохая" функция для суперкомпилятора: второй аргумент растет >>
+fun (addAcc [Nat] [Nat]) -> [Nat] :
+    (addAcc [Z] y) -> y
+  | (addAcc [S x] y) -> (addAcc x [S y]) .
+
+<< 3. Сравнение чисел (eq) >>
+fun (eq [Nat] [Nat]) -> [Bool] :
+    (eq [Z] [Z]) -> [True]
+  | (eq [Z] [S x]) -> [False]
+  | (eq [S x] [Z]) -> [False]
+  | (eq [S x] [S y]) -> (eq x y) .
