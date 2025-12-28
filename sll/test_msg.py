@@ -29,9 +29,9 @@ class TestMSG(unittest.TestCase):
         self.assertEqual(res.gen.name, "v1")
 
         # sub1: v1 -> [Z]
-        self.assertEqual(str(res.sub1["v1"]), "[Z]")
+        self.assertEqual(str(res.sub1[('v', 1)]), "[Z]")
         # sub2: v1 -> [S x]
-        self.assertEqual(str(res.sub2["v1"]), "[S x]")
+        self.assertEqual(str(res.sub2[('v', 1)]), "[S x]")
 
     def test_common_structure(self):
         """Совпадение сверху, различие внутри"""
@@ -49,9 +49,9 @@ class TestMSG(unittest.TestCase):
 
         # Проверяем подстановки
         # v1 -> [Z]
-        self.assertEqual(str(res.sub1["v1"]), "[Z]")
+        self.assertEqual(str(res.sub1[('v', 1)]), "[Z]")
         # v1 -> [S x]
-        self.assertEqual(str(res.sub2["v1"]), "[S x]")
+        self.assertEqual(str(res.sub2[('v', 1)]), "[S x]")
 
     def test_double_conflict(self):
         """Два различия в разных местах"""
@@ -65,8 +65,8 @@ class TestMSG(unittest.TestCase):
         res = msg(t1, t2)
         self.assertEqual(str(res.gen), "(f v1 v2)")
 
-        self.assertEqual(str(res.sub1["v1"]), "[A]")
-        self.assertEqual(str(res.sub1["v2"]), "[B]")
+        self.assertEqual(str(res.sub1[('v', 1)]), "[A]")
+        self.assertEqual(str(res.sub1[('v', 2)]), "[B]")
 
 if __name__ == '__main__':
     unittest.main()
