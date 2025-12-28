@@ -5,7 +5,7 @@ from sll.he import he
 from sll.msg import msg
 from sll.process_tree import Node, Contraction
 from sll.driver import Driver, TransientStep, DecomposeStep, VariantStep, StopStep
-from sll.matching import match
+from sll.matching import match, MatchSuccess
 
 
 def _find_embedding_ancestor(node: Node) -> Node | None:
@@ -44,7 +44,9 @@ def _is_renaming(t1: Expr, t2: Expr) -> bool:
     Проверяет, является ли t1 переименованием t2.
     Эквивалентно: t1 <= t2 И t2 <= t1.
     """
-    return (match(t2, t1) is not None) and (match(t1, t2) is not None)
+    res1 = match(t2, t1)
+    res2 = match(t1, t2)
+    return isinstance(res1, MatchSuccess) and isinstance(res2, MatchSuccess)
 
 
 def _generalize(alpha: Node, beta: Node, unprocessed: list):
@@ -102,17 +104,19 @@ class Supercompiler:
         self.tree = None
 
     def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr]):
-        """Строит дерево процессов для заданного выражения."""
+        """Строит дерево процессов для заданного выражения.
+        start_expr: Начальное выражение для суперкомпиляции.
+        start_var_types: Типы переменных начального выражения.
+        """
         self.tree = Node(start_expr, var_types=start_var_types)
 
         # Очередь необработанных узлов
         unprocessed = [self.tree]
 
         while unprocessed:
-            # Берем первый узел (стратегия в ширину/глубину зависит от pop(0) или pop())
             beta = unprocessed.pop(0)
 
-            # 1. Проверка на зацикливание (Folding)
+            # 1. Проверка на зацикливание (Folding / Свертка)
             # Ищем предка, который "похож" на текущий узел (instance of)
             # Для простоты 2-го этапа: ищем полное совпадение с точностью до переименования
             ancestor = _find_renaming_ancestor(beta)
