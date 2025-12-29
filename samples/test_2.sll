@@ -15,6 +15,5 @@ fun (addAcc [Nat] [Nat]) -> [Nat] :
 << 3. Сравнение чисел (eq) >>
 fun (eq [Nat] [Nat]) -> [Bool] :
     (eq [Z] [Z]) -> [True]
-  | (eq [Z] [S x]) -> [False]
-  | (eq [S x] [Z]) -> [False]
+  | (eq [S x] [S y]) -> [False]
   | (eq [S x] [S y]) -> (eq x y) .
