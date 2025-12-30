@@ -28,6 +28,8 @@ def main():
     parser.add_argument("expr", help="Expression to supercompile, e.g. '(add a b)'")
     parser.add_argument("-t", "--types", nargs="+", help="Variable types, e.g. 'a=Nat b=Nat'", default=[])
     parser.add_argument("-o", "--out", help="Output filename base (saved to ./output/)", default="graph")
+    parser.add_argument("-s", "--strategy", choices=['HE', 'TAG'], default='HE',
+                        help="Whistle strategy: HE (Homeomorphic Embedding) or TAG (Bag of Tags)")
 
     args = parser.parse_args()
 
@@ -73,6 +75,7 @@ def main():
 
     # --- 5. Запуск Суперкомпилятора ---
     print(f"--- Supercompiling: {start_expr} ---")
+    print(f"    Strategy: {args.strategy}")
     print(f"    Context: {start_var_types}")
 
     sc = Supercompiler(prog)

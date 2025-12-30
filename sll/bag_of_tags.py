@@ -15,8 +15,8 @@ class TagBag:
         bag = Counter()
 
         # Если у узла есть тег - добавляем его
-        if expr.tag is not None:
-            bag[expr.tag] += 1
+        tag_val = expr.tag if expr.tag is not None else -1
+        bag[tag_val] += 1
 
         # Рекурсивный спуск
         match expr:
@@ -59,6 +59,9 @@ class TagBag:
         # В статье строгое равенство сетов:
         if keys_old != keys_new:
             return False
+
+        # ОТЛАДКА
+        # print(f"CHECK: {bag_old} vs {bag_new}")
 
         # 2. Проверка размера (Weight)
         size_old = bag_old.total() # Python 3.10+ метод total()

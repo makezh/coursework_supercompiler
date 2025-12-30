@@ -108,6 +108,54 @@ class TestSupervisorFullIntegration(unittest.TestCase):
         # Проверим, что нет бесконечного разворачивания S(S(S...))
         self.assertNotIn("[S [S [S", res)
 
+    def test_5_eq_reflexivity(self):
+        """
+        Тест 5: eq(a, a).
+        Суперкомпилятор должен 'доказать', что число равно самому себе.
+        Результат должен сводиться к True (рекурсивно), ветка False должна исчезнуть.
+        """
+        res = self.run_spsc("(eq a a)", ["a"])
+
+        # 1. Ветка False (неравенство) должна быть удалена как недостижимая (Dead Code)
+        self.assertNotIn("False", res)
+        # 2. Ветка True должна остаться (для Z)
+        self.assertIn("True", res)
+        # 3. Должна быть рекурсия (для S)
+        self.assertTrue("g1" in res or "f1" in res)
+
+    def test_6_add_zero_right(self):
+        """
+        Тест 6: add(a, [Z]).
+        Исходная функция add матчит по первому аргументу.
+        Здесь первый аргумент неизвестен, но второй известен.
+        Суперкомпилятор должен построить функцию копирования.
+        """
+        res = self.run_spsc("(add a [Z])", ["a"])
+
+        # Результат должен быть похож на: g(Z)->Z; g(S x)->S(g x).
+        # Проверяем, что add исчез, а структура осталась.
+        self.assertNotIn("(add", res)
+        self.assertIn("S", res)
+
+    def test_7_dead_code_elimination(self):
+        """
+        Тест 7: eq([S a], [Z]).
+        Заведомо ложное условие.
+        Суперкомпилятор должен вычислить это в False сразу же.
+        """
+        res = self.run_spsc("(eq [S a] [Z])", ["a"])
+
+        # 1. Результат должен быть [False]
+        self.assertIn("False", res)
+
+        # 2. Проверяем, что вызов eq ИСЧЕЗ.
+        # (Это и есть Dead Code Elimination - код вычисления равенства удален).
+        self.assertNotIn("(eq", res)
+
+        # 3. Проверяем, что результат функции - сразу константа
+        # Ожидаем строку вида: ... -> [False];
+        self.assertIn("-> [False]", res)
+
 
 if __name__ == '__main__':
     unittest.main()

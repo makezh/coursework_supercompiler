@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Dict
 from sll.ast_nodes import Expr, Pattern, TypeExpr
+from collections import Counter
 
 
 @dataclass
@@ -22,6 +23,8 @@ class Node:
 
     # Словарь: имя переменной -> выражение типа
     var_types: Dict[str, TypeExpr]
+
+    bag: Optional[Counter] = None        # Мешок тегов (для свистка)
 
     parent: Optional['Node'] = None     # Родитель (Корень - None)
     children: List['Node'] = field(default_factory=list)
