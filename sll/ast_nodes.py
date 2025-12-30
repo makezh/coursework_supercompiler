@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 # --- Выражения ---
@@ -8,7 +8,8 @@ class Expr:
     Базовый класс для всего, что может быть выражением
     """
     lineno: int = field(default=0, compare=False, repr=False)
-
+    # Тег не участвует в сравнении (eq), но важен для свистка
+    tag: Optional[int] = field(default=None, compare=False, repr=False)
 
 @dataclass
 class Var(Expr):
@@ -17,6 +18,7 @@ class Var(Expr):
     """
     name: str
     lineno: int = field(default=0, compare=False, repr=False)
+    tag: Optional[int] = field(default=None, compare=False, repr=False)
 
     def __str__(self):
         return self.name
@@ -32,6 +34,7 @@ class Ctr(Expr):
     name: str
     args: List[Expr]
     lineno: int = field(default=0, compare=False, repr=False)
+    tag: Optional[int] = field(default=None, compare=False, repr=False)
 
     def __str__(self):
         # Если аргументов нет, просто [Nil]
@@ -52,6 +55,7 @@ class FCall(Expr):
     name: str
     args: List[Expr]
     lineno: int = field(default=0, compare=False, repr=False)
+    tag: Optional[int] = field(default=None, compare=False, repr=False)
 
     def __str__(self):
         # Собираем строку вида (fun_name arg1 arg2)
@@ -63,6 +67,7 @@ class FCall(Expr):
 class IntLit(Expr):
     value: int
     lineno: int = field(default=0, compare=False, repr=False)
+    tag: Optional[int] = field(default=None, compare=False, repr=False)
 
     def __str__(self): return str(self.value)
 
@@ -79,6 +84,7 @@ class Let(Expr):
     val: Expr
     body: Expr
     lineno: int = field(default=0, compare=False, repr=False)
+    tag: Optional[int] = field(default=None, compare=False, repr=False)
 
     def __str__(self):
         return f"let {self.var_name} = {self.val} in {self.body}"

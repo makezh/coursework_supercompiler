@@ -129,11 +129,11 @@ def substitute(expr, bindings):
 
         case Ctr(name, args):
             new_args = [substitute(a, bindings) for a in args]
-            return Ctr(name, new_args, lineno=expr.lineno)
+            return Ctr(name, new_args, lineno=expr.lineno, tag=expr.tag)
 
         case FCall(name, args):
             new_args = [substitute(a, bindings) for a in args]
-            return FCall(name, new_args, lineno=expr.lineno)
+            return FCall(name, new_args, lineno=expr.lineno, tag=expr.tag)
 
         case IntLit():
             return expr
