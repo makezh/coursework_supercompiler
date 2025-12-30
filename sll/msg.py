@@ -25,6 +25,10 @@ class GenResult:
 class MSGBuilder:
     def __init__(self):
         self.counter = 0
+        # Значение: уже созданная переменная Var
+        self.memo: Dict[Tuple[str, str], Var] = {}
+        # Также нужно помнить ключи VarKey для этих переменных, чтобы не терять их
+        self.memo_keys: Dict[Tuple[str, str], VarKey] = {}
 
     def _fresh_var_key(self) -> VarKey:
         """Возвращает кортеж ('v', номер), который идеально сортируется."""
@@ -57,11 +61,24 @@ class MSGBuilder:
                 return t1, {}, {}
 
             case _:
-                # 3. Если корни РАЗНЫЕ — это конфликт.
-                # Создаем общую переменную-дырку.
+                # --- Тесное обобщение (Common Subexpression Elimination) ---
+                # Проверяем, видели ли мы такую пару (t1, t2) раньше?
+                pair_key = (str(t1), str(t2))
+
+                if pair_key in self.memo:
+                    # Возвращаем старую переменную.
+                    # Словари подстановок пустые, т.к. они уже были заполнены в первый раз.
+                    existing_var = self.memo[pair_key]
+                    return existing_var, {}, {}
+
+                # Если не видели — создаем новую
                 key = self._fresh_var_key()
                 name_str = f"{key[0]}{key[1]}"
                 new_var = Var(name_str)
+
+                # Запоминаем в кэш
+                self.memo[pair_key] = new_var
+                self.memo_keys[pair_key] = key
 
                 return new_var, {key: t1}, {key: t2}
 

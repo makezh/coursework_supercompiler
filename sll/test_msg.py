@@ -68,5 +68,46 @@ class TestMSG(unittest.TestCase):
         self.assertEqual(str(res.sub1[('v', 1)]), "[A]")
         self.assertEqual(str(res.sub1[('v', 2)]), "[B]")
 
+    def test_tight_generalization(self):
+        """
+        Тест на уплотнение (пример научника).
+        t1 = [A [B x] y [B x] y]
+        t2 = [A p [C r] p [C r]]
+
+        Ожидаем: [A v1 v2 v1 v2]
+        БЕЗ уплотнения было бы: [A v1 v2 v3 v4]
+        """
+        # Упростим пример для наглядности (без лишних вложенностей)
+        # t1: f(x, y, x, y)
+        # t2: f(a, b, a, b)
+
+        t1 = self._expr("(f x y x y)")
+        t2 = self._expr("(f a b a b)")
+
+        res = msg(t1, t2)
+
+        print(f"Gen: {res.gen}")
+        print(f"Sub1: {res.sub1}")
+
+        # Проверяем, что в результате только ДВЕ переменные (v1 и v2), а не 4
+        # Текстовое представление должно быть (f v1 v2 v1 v2)
+        self.assertEqual(str(res.gen), "(f v1 v2 v1 v2)")
+
+        # Проверяем количество уникальных ключей в подстановке
+        self.assertEqual(len(res.sub1), 2)
+
+    def test_no_tight_if_different(self):
+        """
+        Проверяем, что разные пары все же дают разные переменные.
+        t1: f(x, y)
+        t2: f(a, b)
+        """
+        t1 = self._expr("(f x y)")
+        t2 = self._expr("(f a b)")
+
+        res = msg(t1, t2)
+        self.assertEqual(str(res.gen), "(f v1 v2)")
+        self.assertEqual(len(res.sub1), 2)
+
 if __name__ == '__main__':
     unittest.main()
