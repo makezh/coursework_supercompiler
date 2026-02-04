@@ -92,7 +92,6 @@ class Driver:
     def _drive_call(self, expr: FCall, var_types: Dict[str, TypeExpr]) -> DriveStep:
         """
         Rule-Based Driving для вызова функции.
-        Перебирает правила и смотрит, что применимо.
         """
         branches = []
 
@@ -100,38 +99,40 @@ class Driver:
         rules = [r for r in self.program.rules if r.pattern.name == expr.name]
 
         for rule in rules:
-            # Пытаемся сопоставить аргументы вызова с паттерном правила
-
-            # Cоздаем фиктивные FCall, чтобы использовать логику match для списка аргументов
             pat_dummy = FCall("dummy", rule.pattern.params)
             call_dummy = FCall("dummy", expr.args)
 
             res = match_term(pat_dummy, call_dummy)
 
             match res:
-                # Полное совпадение -> Редукция
                 case MatchSuccess(bindings):
-                    # Делаем подстановку в правую часть.
+                    # Почему поменял:
+                    # Если до этого мы уже нашли правила, требующие сужения (branches не пуст),
+                    # то мы НЕ МОЖЕМ применять это правило, так как более приоритетные
+                    # правила "застряли" на переменной. Мы обязаны делать ветвление.
+                    if branches:
+                        return VariantStep(branches=branches)
+
+                    # Если препятствий не было — редуцируем
                     new_expr = substitute(rule.body, bindings)
                     return TransientStep(next_expr=new_expr)
 
-                # Сужение -> Кандидат на ветвление
                 case MatchNarrowing(var_name, constr_name, _):
                     # Нашли переменную для сужения
                     branch = self._create_branch(expr, var_name, constr_name, var_types)
                     if branch:
                         branches.append(branch)
+                    # Мы продолжаем цикл, чтобы собрать ветки для других конструкторов
+                    # (например, Rule 1 требует Z, Rule 2 требует S)
 
                 case MatchFail():
-                    # Ничего не подходит, пробуем следующее правило
                     continue
 
-        # Если есть ветвления, возвращаем их
+        # Если вышли из цикла и есть ветки — возвращаем их
         if branches:
             return VariantStep(branches=branches)
 
-        # Если веток нет, значит нам мешает вложенный вызов —
-        # Ищем первый вложенный вызов и прогоняем его
+        # Если веток нет, значит нам мешает вложенный вызов
         return self._drive_nested(expr, var_types)
 
     def _create_branch(self, expr: FCall, var_name: str, constr_name: str, var_types: Dict[str, TypeExpr]) -> Optional[

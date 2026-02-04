@@ -20,6 +20,11 @@ fun (add [Nat] [Nat]) -> [Nat] :
 << Функция с вложенным вызовом >>
 fun (double [Nat]) -> [Nat] :
     (double x) -> (add x x) .
+    
+fun (eq [Nat] [Nat]) -> [Bool] :
+    (eq [Z] [Z]) -> [True]
+  | (eq [S x] [S y]) -> (eq x y)
+  | (eq x y) -> [False] .
 """
 
 
@@ -96,6 +101,31 @@ class TestRuleBasedDriver(unittest.TestCase):
         br_expr, _, _ = step.branches[0]
         # Результат onlyZero([Z]) -> [Z]. Итоговое: (add [Z] y)
         self.assertEqual(str(br_expr), "(add [Z] y)")
+
+    def test_catch_all_order(self):
+        """
+        Тест на порядок правил.
+        Выражение: (eq x x).
+
+        Ожидание:
+        Драйвер должен остановиться на 1-м правиле (eq [Z] [Z]), потому что оно требует сужения x -> Z.
+        Он НЕ ДОЛЖЕН проскакивать к 3-му правилу (eq x y), которое дает False.
+
+        Результат должен быть VariantStep (ветвление), а не TransientStep (False).
+        """
+        expr = self._expr("(eq x x)")
+        var_types = {"x": TypeExpr("Nat", [])}
+
+        step = self.driver.drive(expr, var_types)
+
+        # Если драйвер работает неправильно, он вернет TransientStep с [False].
+        if isinstance(step, TransientStep):
+            self.fail(f"ОШИБКА! Драйвер проскочил сужение и вернул результат: {step.next_expr}")
+
+        # Если правильно - должен вернуть Ветвление
+        self.assertIsInstance(step, VariantStep)
+        self.assertEqual(len(step.branches), 2) # Z и S
+        print("✅ Тест на порядок правил прошел успешно (ветвление вместо False)")
 
 
 if __name__ == '__main__':
