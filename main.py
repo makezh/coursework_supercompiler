@@ -10,7 +10,7 @@ from sll.type_checker import check_program
 from sll.supercompiler import Supercompiler
 from sll.residualizer import Residualizer
 from sll.exporter import to_dot
-from sll.ast_nodes import TypeExpr
+from sll.ast_nodes import TypeExpr, Var
 
 # Настройки папок
 SAMPLES_DIR = "samples"
@@ -57,15 +57,53 @@ def main():
         print(f"Error: {e}")
         return
 
-    # --- 3. Парсинг выражения ---
+    # --- 3. Парсинг выражения и Авто-определение сигнатуры ---
+    start_var_types = {}
+
+    # Если введено просто имя (например, 'add3'), а не выражение со скобками
+    if "(" not in args.expr and ")" not in args.expr:
+        func_name = args.expr
+
+        # Ищем сигнатуру функции
+        sig = next((s for s in prog.signatures if s.name == func_name), None)
+
+        if sig:
+            # Пытаемся взять имена аргументов из первого правила этой функции
+            first_rule = next((r for r in prog.rules if r.pattern.name == func_name), None)
+
+            arg_names = []
+            if first_rule:
+                for i, p in enumerate(first_rule.pattern.params):
+                    # Если в паттерне переменная — берем её имя, если конструктор — генерируем v...
+                    if isinstance(p, Var):
+                        arg_names.append(p.name)
+                    else:
+                        arg_names.append(f"v{i+1}")
+            else:
+                # Если правил почему-то нет, просто генерируем v1, v2...
+                arg_names = [f"v{i+1}" for i in range(len(sig.arg_types))]
+
+            # Формируем итоговое выражение: (func x y z)
+            args.expr = f"({func_name} {' '.join(arg_names)})"
+
+            # Автоматически заполняем типы из сигнатуры
+            for i, t_expr in enumerate(sig.arg_types):
+                start_var_types[arg_names[i]] = t_expr
+
+            print(f"--- Auto-inferred signature: {args.expr} ---")
+        else:
+            print(f"Error: Function '{func_name}' not found in signatures.")
+            return
+
+    # Парсим уже готовое (или введенное вручную) выражение
     try:
         start_expr = Parser(tokenize(args.expr)).parse_expr()
     except Exception as e:
         print(f"Expression Parse Error: {e}")
         return
 
-    # --- 4. Разбор типов переменных ---
-    start_var_types = {}
+    # --- 4. Разбор типов переменных (если переданы вручную через -t) ---
+    # Ручные типы имеют приоритет над автоматическими
     for t_str in args.types:
         if "=" not in t_str:
             print(f"Error: Invalid type format '{t_str}'. Use 'var=Type'")
