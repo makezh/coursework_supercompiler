@@ -9,16 +9,16 @@ class TagBag:
     @staticmethod
     def collect(expr: Expr) -> Counter:
         """
-        Рекурсивно собирает все теги из выражения в Counter.
-        Игнорирует tag=None (свежие переменные и конструкторы, созданные драйвером).
+        Рекурсивно собирает теги, пришедшие из исходной программы.
+        Если у узла tag=None, он игнорируется (не вносит вклад в мешок).
         """
         bag = Counter()
 
-        # Если у узла есть тег - добавляем его
-        tag_val = expr.tag if expr.tag is not None else -1
-        bag[tag_val] += 1
+        # Добавляем тег только если он существует
+        if expr.tag is not None:
+            bag[expr.tag] += 1
 
-        # Рекурсивный спуск
+        # Рекурсивный спуск по всем видам узлов
         match expr:
             case Ctr(_, args) | FCall(_, args):
                 for arg in args:
@@ -49,22 +49,12 @@ class TagBag:
         if not bag_old:
             return False
 
-        keys_old = set(bag_old.keys())
-        keys_new = set(bag_new.keys())
+        # 1. Проверяем мультимножественное включение
+        is_superset = (bag_new >= bag_old)
 
-        # 1. Проверка на совпадение "состава" (ингредиентов)
-        # Если в новом появились теги, которых не было в старом - это не зацикливание,
-        # это мы просто пошли в другую ветку кода.
-        # А вот если ключи равны (или new подмножество old), то мы топчемся на месте.
-        # В статье строгое равенство сетов:
-        if keys_old != keys_new:
+        if not is_superset:
             return False
 
-        # ОТЛАДКА
-        # print(f"CHECK: {bag_old} vs {bag_new}")
-
-        # 2. Проверка размера (Weight)
-        size_old = bag_old.total() # Python 3.10+ метод total()
-        size_new = bag_new.total()
-
-        return size_new > size_old
+        # 2. Если это надмножество, проверяем, вырос ли вес
+        # (чтобы не свистеть на идентичных конфигурациях, их обработает Folding)
+        return bag_new.total() > bag_old.total()
