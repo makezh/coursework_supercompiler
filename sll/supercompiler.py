@@ -4,7 +4,7 @@ from sll.ast_nodes import Program, Expr, FCall, TypeExpr
 from sll.he import he
 from sll.msg import msg, natural_key
 from sll.process_tree import Node, Contraction
-from sll.driver import Driver, TransientStep, DecomposeStep, VariantStep, StopStep
+from sll.driver import Driver, TransientStep, DecomposeStep, VariantStep, StopStep, DriveStep
 from sll.matching import match, MatchSuccess
 from sll.preprocessor import add_tags, Tagger
 from sll.bag_of_tags import TagBag
@@ -52,7 +52,6 @@ class Supercompiler:
         if self.strategy == 'TAG':
             add_tags(self.program)
             tagger = Tagger()
-            # Начинаем с большого числа, чтобы не пересечься с программой (хак, но рабочий)
             tagger.counter = 100000
             tagger._tag_expr(start_expr)
 
@@ -73,19 +72,25 @@ class Supercompiler:
                 beta.back_link = ancestor
                 continue
 
-            # --- 2. Whistle & Generalization ---
-            # Проверяем, не вкладывается ли предок в нас (alpha <| beta).
-            # Это сигнал опасности (бесконечный рост).
+            # 2. Спрашиваем драйвер: "А что ты можешь сделать?"
+            step = self.driver.drive(beta.expr, beta.var_types)
+
+            # 3. Если это НЕ VariantStep (т.е. однозначный шаг или остановка)
+            # то мы просто выполняем его без проверки свистком!
+            if not isinstance(step, VariantStep):
+                self._drive_node_with_step(beta, step, unprocessed)
+                continue
+
+            # 4. А вот если драйвер хочет ВЕТВИТЬСЯ (VariantStep)
+            # Тут проверяем свисток, чтобы не плодить бесконечные ветки
             dangerous_alpha = self._find_embedding_ancestor(beta)
 
             if dangerous_alpha:
-                # ОПАСНОСТЬ! Делаем обобщение (MSG).
+                # Обобщаем
                 self._generalize(dangerous_alpha, beta, unprocessed)
-                # Текущий узел beta больше не нужен, мы перестроили дерево сверху.
-                continue
-
-            # --- 3. Драйвинг - вычисляем, если все спокойно ---
-            self._drive_node(beta, unprocessed)
+            else:
+                # Все спокойно, ветвимся
+                self._drive_node_with_step(beta, step, unprocessed)
 
     def _create_node(self, expr: Expr, var_types: Dict[str, TypeExpr]) -> Node:
         """Создает узел и сразу считает мешок тегов, если нужно."""
@@ -94,33 +99,27 @@ class Supercompiler:
             node.bag = TagBag.collect(expr)
         return node
 
-    def _drive_node(self, node: Node, unprocessed: list):
-        """Выполняет шаг прогонки и добавляет детей в дерево."""
-        step = self.driver.drive(node.expr, node.var_types)
-
+    def _drive_node_with_step(self, node: Node, step: DriveStep, unprocessed: list):
+        """Выполняет уже вычисленный шаг драйвинга."""
         new_children = []
         match step:
             case StopStep():
-                pass  # Лист
-
+                return
             case TransientStep(next_expr):
                 child = self._create_node(next_expr, var_types=node.var_types.copy())
                 node.add_child(child)
                 new_children.append(child)
-
             case DecomposeStep(parts):
                 for part in parts:
                     child = self._create_node(part, var_types=node.var_types.copy())
                     node.add_child(child)
                     new_children.append(child)
-
             case VariantStep(branches):
                 for expr_branch, contraction, branch_types in branches:
                     child = self._create_node(expr_branch, var_types=branch_types)
                     node.add_child(child, contraction)
                     new_children.append(child)
 
-        # Добавляем новых детей в конец (Breadth First), чтобы находить кратчайшие циклы.
         unprocessed.extend(new_children)
 
     def _find_embedding_ancestor(self, node: Node) -> Node | None:
