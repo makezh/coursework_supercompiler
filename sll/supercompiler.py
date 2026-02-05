@@ -2,7 +2,7 @@ from typing import Dict, Optional
 
 from sll.ast_nodes import Program, Expr, FCall, TypeExpr
 from sll.he import he
-from sll.msg import msg
+from sll.msg import msg, natural_key
 from sll.process_tree import Node, Contraction
 from sll.driver import Driver, TransientStep, DecomposeStep, VariantStep, StopStep
 from sll.matching import match, MatchSuccess
@@ -186,12 +186,11 @@ class Supercompiler:
         # 3. Создаем новых детей для alpha из подстановки
         # Важно сохранить порядок переменных, чтобы потом правильно генерировать код.
         # msg генерирует v1, v2... по порядку.
-        sorted_keys = sorted(res.sub1.keys())  # [('v', 1), ('v', 2)]
+        sorted_vnames = sorted(res.sub1.keys(), key=natural_key)
 
-        for key in sorted_keys:
-            val_expr = res.sub1[key]
+        for v_name in sorted_vnames:
+            val_expr = res.sub1[v_name]
 
-            v_name = f"{key[0]}{key[1]}"
             # Создаем ребенка.
             child = Node(val_expr, var_types=alpha.var_types.copy())
 
