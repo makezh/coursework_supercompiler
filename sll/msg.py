@@ -1,10 +1,7 @@
+import re
 from dataclasses import dataclass
 from typing import Dict, Tuple
 from sll.ast_nodes import Expr, Var, Ctr, FCall, IntLit
-
-# Тип для ключа переменной: ('v', 10)
-VarKey = Tuple[str, int]
-
 
 @dataclass
 class GenResult:
@@ -13,13 +10,13 @@ class GenResult:
     gen: Обобщенное выражение (паттерн с дырками)
 
     sub1: Словарь замен, чтобы получить исходное выражение 1
-    Пример: { ('v', 1): [Z], ('v', 2): [S x] ... }
+    Пример: { 'v1': [Z], 'v2': [S x] ... }
 
     sub2: Словарь замен, чтобы получить исходное выражение 2
     """
     gen: Expr
-    sub1: Dict[VarKey, Expr]
-    sub2: Dict[VarKey, Expr]
+    sub1: Dict[str, Expr]
+    sub2: Dict[str, Expr]
 
 
 class MSGBuilder:
@@ -27,20 +24,19 @@ class MSGBuilder:
         self.counter = 0
         # Значение: уже созданная переменная Var
         self.memo: Dict[Tuple[str, str], Var] = {}
-        # Также нужно помнить ключи VarKey для этих переменных, чтобы не терять их
-        self.memo_keys: Dict[Tuple[str, str], VarKey] = {}
 
-    def _fresh_var_key(self) -> VarKey:
-        """Возвращает кортеж ('v', номер), который идеально сортируется."""
+    def _fresh_var_name(self) -> str:
+        """Генерирует следующее имя переменной: v1, v2, v3..."""
         self.counter += 1
-        return "v", self.counter
+        return f"v{self.counter}"
 
     def generalize(self, t1: Expr, t2: Expr) -> GenResult:
         self.counter = 0
+        self.memo = {}
         gen, s1, s2 = self._gen_recursive(t1, t2)
         return GenResult(gen, s1, s2)
 
-    def _gen_recursive(self, t1: Expr, t2: Expr) -> Tuple[Expr, Dict[VarKey, Expr], Dict[VarKey, Expr]]:
+    def _gen_recursive(self, t1: Expr, t2: Expr) -> Tuple[Expr, Dict[str, Expr], Dict[str, Expr]]:
         # 1. Если это ОДИНАКОВЫЕ переменные
         if isinstance(t1, Var) and isinstance(t2, Var) and t1.name == t2.name:
             return t1, {}, {}
@@ -66,21 +62,18 @@ class MSGBuilder:
                 pair_key = (str(t1), str(t2))
 
                 if pair_key in self.memo:
-                    # Возвращаем старую переменную.
-                    # Словари подстановок пустые, т.к. они уже были заполнены в первый раз.
-                    existing_var = self.memo[pair_key]
-                    return existing_var, {}, {}
+                    # Если мы уже заменяли такую пару (t1, t2) на переменную,
+                    # используем ту же самую переменную снова.
+                    return self.memo[pair_key], {}, {}
 
                 # Если не видели — создаем новую
-                key = self._fresh_var_key()
-                name_str = f"{key[0]}{key[1]}"
-                new_var = Var(name_str)
+                name = self._fresh_var_name()
+                new_var = Var(name)
 
                 # Запоминаем в кэш
                 self.memo[pair_key] = new_var
-                self.memo_keys[pair_key] = key
 
-                return new_var, {key: t1}, {key: t2}
+                return new_var, {name: t1}, {name: t2}
 
     def _merge_args(self, name: str, args1: list, args2: list, is_ctr: bool):
         """
@@ -105,3 +98,11 @@ class MSGBuilder:
 def msg(t1: Expr, t2: Expr) -> GenResult:
     """Удобная обертка для вызова"""
     return MSGBuilder().generalize(t1, t2)
+
+def natural_key(string_key):
+    """Превращает 'v10' в ('v', 10) для правильной сортировки"""
+    # Разделяем текст и числа
+    match = re.match(r"([a-z]+)([0-9]+)", string_key)
+    if match:
+        return match.group(1), int(match.group(2))
+    return string_key

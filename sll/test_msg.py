@@ -29,9 +29,9 @@ class TestMSG(unittest.TestCase):
         self.assertEqual(res.gen.name, "v1")
 
         # sub1: v1 -> [Z]
-        self.assertEqual(str(res.sub1[('v', 1)]), "[Z]")
+        self.assertEqual(str(res.sub1['v1']), "[Z]")
         # sub2: v1 -> [S x]
-        self.assertEqual(str(res.sub2[('v', 1)]), "[S x]")
+        self.assertEqual(str(res.sub2['v1']), "[S x]")
 
     def test_common_structure(self):
         """Совпадение сверху, различие внутри"""
@@ -49,9 +49,9 @@ class TestMSG(unittest.TestCase):
 
         # Проверяем подстановки
         # v1 -> [Z]
-        self.assertEqual(str(res.sub1[('v', 1)]), "[Z]")
+        self.assertEqual(str(res.sub1['v1']), "[Z]")
         # v1 -> [S x]
-        self.assertEqual(str(res.sub2[('v', 1)]), "[S x]")
+        self.assertEqual(str(res.sub2['v1']), "[S x]")
 
     def test_double_conflict(self):
         """Два различия в разных местах"""
@@ -65,8 +65,8 @@ class TestMSG(unittest.TestCase):
         res = msg(t1, t2)
         self.assertEqual(str(res.gen), "(f v1 v2)")
 
-        self.assertEqual(str(res.sub1[('v', 1)]), "[A]")
-        self.assertEqual(str(res.sub1[('v', 2)]), "[B]")
+        self.assertEqual(str(res.sub1['v1']), "[A]")
+        self.assertEqual(str(res.sub1['v2']), "[B]")
 
     def test_tight_generalization(self):
         """
@@ -108,6 +108,26 @@ class TestMSG(unittest.TestCase):
         res = msg(t1, t2)
         self.assertEqual(str(res.gen), "(f v1 v2)")
         self.assertEqual(len(res.sub1), 2)
+
+    def test_msg_substitute_roundtrip(self):
+        """Проверка: gen + sub1 == t1 И gen + sub2 == t2"""
+        from sll.matching import substitute
+
+        t1 = self._expr("(f [Z] [S [Z]] [Z])")
+        t2 = self._expr("(f [S x] [S [S x]] [S x])")
+
+        res = msg(t1, t2)
+
+        # Ожидаем, что MSG нашел одинаковые пары и выдал (f v1 [S v1] v1)
+        self.assertEqual(str(res.gen), "(f v1 [S v1] v1)")
+
+        # Проверяем восстановление t1
+        t1_recovered = substitute(res.gen, res.sub1)
+        self.assertEqual(str(t1_recovered), str(t1))
+
+        # Проверяем восстановление t2
+        t2_recovered = substitute(res.gen, res.sub2)
+        self.assertEqual(str(t2_recovered), str(t2))
 
 if __name__ == '__main__':
     unittest.main()
