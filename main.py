@@ -132,6 +132,19 @@ def main():
     print(f"--- Exporting Graph to {OUTPUT_DIR}/ ---")
     dot_code = to_dot(sc.tree)
 
+    graph_label = (
+        f"Expression: {args.expr}\\n"
+        f"Whistle Strategy: {args.strategy} | Gen Type: {args.gen}"
+    )
+
+    header_settings = (
+        f'\n  label="{graph_label}";\n'
+        f'  labelloc="t";\n'      # Расположить сверху (top)
+        f'  fontsize=20;\n'       # Размер шрифта
+        f'  fontname="Arial";\n'
+    )
+    dot_code = dot_code.replace('{', '{' + header_settings, 1)
+
     # Сохраняем .dot
     with open(f"{out_path_base}.dot", 'w', encoding='utf-8') as f:
         f.write(dot_code)
