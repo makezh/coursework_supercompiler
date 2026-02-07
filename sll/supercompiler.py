@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from sll.ast_nodes import Program, Expr, FCall, TypeExpr
 from sll.he import he
@@ -41,6 +41,8 @@ class Supercompiler:
     def __init__(self, program: Program, strategy: str = "HE", gen_type: str = "TOP"):
         self.program = program
         self.driver = Driver(program)
+        # Храним все деревья гиперцикла: {выражение_строкой: корень_дерева}
+        self.hypercycle_roots: Dict[str, Node] = {}
         self.tree: Optional[Node] = None
         self.strategy = strategy
         self.gen_type = gen_type
@@ -223,3 +225,56 @@ class Supercompiler:
             let_info = Contraction(var_name=v_name, pattern=None)
             beta.add_child(child, let_info)
             unprocessed.append(child)
+
+    def run_hypercycle(self, start_expr, start_var_types):
+        """
+        Реализация Гиперцикла Абрамова.
+        Итеративно строит графы для всех базисных конфигураций.
+        """
+        # Набор выражений, которые мы уже суперкомпилировали (базисные конфигурации)
+        processed_configs = {} # {str(expr): Node}
+
+        # Очередь на суперкомпиляцию. Первым идет стартовое выражение.
+        queue = [(start_expr, start_var_types)]
+
+        while queue:
+            current_expr, current_types = queue.pop(0)
+            expr_str = str(current_expr)
+            if expr_str in processed_configs:
+                continue
+
+            print(f"  Hypercycle: processing config {expr_str}")
+
+            # Строим дерево
+            self.build_tree(current_expr, current_types)
+
+            # Сохраняем корень этого дерева
+            processed_configs[expr_str] = self.tree
+
+            # Ищем новые базисные конфигурации
+            new_bases = self._find_all_backlink_targets(self.tree)
+            for base_node in new_bases:
+                b_str = str(base_node.expr)
+                if b_str not in processed_configs:
+                    queue.append((base_node.expr, base_node.var_types))
+
+        self.hypercycle_roots = processed_configs
+        self.tree = processed_configs[str(start_expr)]
+        forest_root = Node(FCall("PROGRAM_FOREST", []), {})
+        for expr_str, root_node in self.hypercycle_roots.items():
+            forest_root.add_child(root_node)
+
+        self.tree = forest_root
+
+    def _find_all_backlink_targets(self, root: Node) -> List[Node]:
+        """Собирает все узлы, на которые КТО-ТО ссылается через back_link."""
+        targets = set()
+
+        def collect(node: Node):
+            if node.back_link:
+                targets.add(node.back_link)
+            for child in node.children:
+                collect(child)
+
+        collect(root)
+        return list(targets)

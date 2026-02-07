@@ -120,7 +120,12 @@ def main():
     print(f"    Context: {start_var_types}")
 
     sc = Supercompiler(prog, strategy=args.strategy, gen_type=args.gen)
-    sc.build_tree(start_expr, start_var_types)
+    if args.gen == 'TOP':
+        print("Running Classical TOP-down Supercompilation...")
+        sc.build_tree(start_expr, start_var_types)
+    else:
+        print("Running Abramov's BOTTOM-up Supercompilation with Hypercycle...")
+        sc.run_hypercycle(start_expr, start_var_types)
 
     # --- 6. Экспорт (Graphviz) ---
     # Создаем папку output, если нет
