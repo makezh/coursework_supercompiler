@@ -1,0 +1,29 @@
+type [Nat] : Z | S [Nat] .
+type [Bool] : True | False .
+
+<< 1. Классическое сложение (add) >>
+fun (add [Nat] [Nat]) -> [Nat] :
+    (add [Z] y) -> y
+  | (add [S x] y) -> [S (add x y)] .
+
+<< 2. Сравнение чисел (eq) >>
+fun (eq [Nat] [Nat]) -> [Bool] :
+    (eq [Z] [Z]) -> [True]
+  | (eq [S x] [S y]) -> (eq x y)
+  | (eq x y) -> [False] .
+
+<< x ≠ x + 1 >>
+fun (xnotx1 [Nat]) -> [Bool] :
+    (xnotx1 x) -> (eq x [S x]) .
+
+<< x + 1 = x + 1 >>
+fun (x1eqx1 [Nat]) -> [Bool] :
+    (x1eqx1 x) -> (eq [S x] [S x]) .
+
+<< x = x >>
+fun (xeqx [Nat]) -> [Bool] :
+    (xeqx x) -> (eq x x) .
+
+<< x + y + z >>
+fun (add3 [Nat] [Nat] [Nat]) -> [Nat] :
+    (add3 x y z) -> (add (add x y) z) .

@@ -38,11 +38,12 @@ def _is_renaming(t1: Expr, t2: Expr) -> bool:
 
 
 class Supercompiler:
-    def __init__(self, program: Program, strategy: str = "HE"):
+    def __init__(self, program: Program, strategy: str = "HE", gen_type: str = "TOP"):
         self.program = program
         self.driver = Driver(program)
         self.tree: Optional[Node] = None
         self.strategy = strategy
+        self.gen_type = gen_type
 
         # Если выбрана стратегия TAG, нам нужно один раз разметить всю программу
         self.tag_allocator = None
@@ -78,8 +79,12 @@ class Supercompiler:
             # Здесь происходит выбор: HE или TAG
             dangerous_alpha = self._find_embedding_ancestor(beta)
             if dangerous_alpha:
-                # Если свисток сработал, обобщаем (MSG)
-                self._generalize(dangerous_alpha, beta, unprocessed)
+                if self.gen_type == 'TOP':
+                    # Классика: рубим дерево сверху
+                    self._generalize(dangerous_alpha, beta, unprocessed)
+                else:
+                    # Абрамов: перестраиваем текущий узел снизу
+                    self._generalize_bottom(dangerous_alpha, beta, unprocessed)
                 continue
 
             # --- Шаг В: Драйвинг ---
@@ -193,4 +198,28 @@ class Supercompiler:
             let_info = Contraction(var_name=v_name, pattern=None)
 
             alpha.add_child(child, let_info)
+            unprocessed.append(child)
+
+    def _generalize_bottom(self, alpha: Node, beta: Node, unprocessed: list):
+        """
+        Стратегия Абрамова (снизу):
+        Обобщаем текущий узел beta относительно предка alpha.
+        """
+        res = msg(alpha.expr, beta.expr)
+
+        # Обновляем выражение в ТЕКУЩЕМ узле beta
+        beta.expr = res.gen
+        if self.strategy == 'TAG':
+            beta.bag = TagBag.collect(beta.expr)
+
+        # Создаем детей для beta из того, что попало в подстановку (v1 -> expr1, ...)
+        sorted_vnames = sorted(res.sub2.keys(), key=natural_key) # sub2 - подстановка для beta
+
+        for v_name in sorted_vnames:
+            val_expr = res.sub2[v_name]
+            child = self._create_node(val_expr, var_types=beta.var_types.copy())
+
+            # Помечаем ребро как let-связывание
+            let_info = Contraction(var_name=v_name, pattern=None)
+            beta.add_child(child, let_info)
             unprocessed.append(child)

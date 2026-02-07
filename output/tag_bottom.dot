@@ -1,0 +1,28 @@
+digraph ProcessTree {
+  label="Expression: (add3 x y z)\nWhistle Strategy: TAG | Gen Type: BOTTOM";
+  labelloc="t";
+  fontsize=20;
+  fontname="Arial";
+
+    node [fontname="Courier New"];
+    edge [fontname="Courier New"];
+    n0 [label="(add3 x y z)", shape=box];
+    n0 -> n1 [label=""];
+    n1 [label="(add (add x y) z)", shape=box];
+    n1 -> n2 [label="x -> (Z )"];
+    n1 -> n3 [label="x -> (S v1)"];
+    n2 [label="(add y z)", shape=box];
+    n2 -> n4 [label="y -> (Z )"];
+    n2 -> n5 [label="y -> (S v2)"];
+    n3 [label="(add [S (add v1 y)] z)", shape=box];
+    n3 -> n6 [label=""];
+    n4 [label="z", shape=box];
+    n5 [label="[S (add v2 z)]", shape=box];
+    n5 -> n7 [label=""];
+    n6 [label="[S (add (add v1 y) z)]", shape=box];
+    n6 -> n8 [label=""];
+    n7 [label="(add v2 z)", shape=box];
+    n7 -> n2 [style=dashed, color=red, label="Folding"];
+    n8 [label="(add (add v1 y) z)", shape=box];
+    n8 -> n1 [style=dashed, color=red, label="Folding"];
+}

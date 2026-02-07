@@ -1,0 +1,15 @@
+digraph ProcessTree {
+  label="Expression: (add3 x y z)\nWhistle Strategy: HE | Gen Type: TOP";
+  labelloc="t";
+  fontsize=20;
+  fontname="Arial";
+
+    node [fontname="Courier New"];
+    edge [fontname="Courier New"];
+    n0 [label="(add3 x y z)", shape=box];
+    n0 -> n1 [label=""];
+    n1 [label="(add v1 z)", shape=box];
+    n1 -> n2 [label="let v1"];
+    n2 [label="(add x y)", shape=box];
+    n2 -> n1 [style=dashed, color=red, label="Folding"];
+}

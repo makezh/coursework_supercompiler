@@ -119,7 +119,7 @@ def main():
     print(f"    Generalize type: {args.gen}")
     print(f"    Context: {start_var_types}")
 
-    sc = Supercompiler(prog, strategy=args.strategy)
+    sc = Supercompiler(prog, strategy=args.strategy, gen_type=args.gen)
     sc.build_tree(start_expr, start_var_types)
 
     # --- 6. Экспорт (Graphviz) ---
