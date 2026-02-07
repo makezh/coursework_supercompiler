@@ -30,6 +30,8 @@ def main():
     parser.add_argument("-o", "--out", help="Output filename base (saved to ./output/)", default="graph")
     parser.add_argument("-s", "--strategy", choices=['HE', 'TAG'], default='HE',
                         help="Whistle strategy: HE (Homeomorphic Embedding) or TAG (Bag of Tags)")
+    parser.add_argument("-g", "--gen", choices=['TOP', 'BOTTOM'], default='TOP',
+                    help="Generalization type: TOP (rewrite ancestor) or BOTTOM (rewrite current)")
 
     args = parser.parse_args()
 
@@ -114,9 +116,10 @@ def main():
     # --- 5. Запуск Суперкомпилятора ---
     print(f"--- Supercompiling: {start_expr} ---")
     print(f"    Strategy: {args.strategy}")
+    print(f"    Generalize type: {args.gen}")
     print(f"    Context: {start_var_types}")
 
-    sc = Supercompiler(prog)
+    sc = Supercompiler(prog, strategy=args.strategy)
     sc.build_tree(start_expr, start_var_types)
 
     # --- 6. Экспорт (Graphviz) ---

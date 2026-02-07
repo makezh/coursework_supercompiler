@@ -1,109 +1,109 @@
 import unittest
-from sll.parser import parse, Parser, tokenize
-from sll.preprocessor import add_tags
+from collections import Counter
+from sll.ast_nodes import Var, Ctr, FCall, Program, Rule, Pattern, TypeExpr, FunSig
 from sll.matching import substitute
-from sll.ast_nodes import Var, Ctr, FCall
+from sll.bag_of_tags import TagBag
+from sll.preprocessor import Tagger
+from sll.supercompiler import Supercompiler
 
-# Программа на твоем диалекте SLL
-CODE = """
-type [Nat] : Z | S [Nat] .
-type [List] : Nil | Cons x [List] .
+class TestBagOfTagsExact(unittest.TestCase):
 
-<< Простая функция для теста >>
-fun (wrap [Nat]) -> [Nat] :
-    (wrap x) -> [S x] .
-
-<< Функция посложнее >>
-fun (makeList [Nat]) -> [List] :
-    (makeList x) -> [Cons x [Nil]] .
-"""
-
-class TestTags(unittest.TestCase):
-
-    def setUp(self):
-        self.prog = parse(CODE)
-        # ВАЖНО: Запускаем препроцессор, чтобы расставить теги
-        add_tags(self.prog)
-
-    def test_1_tags_assigned(self):
-        """Проверяем, что после add_tags у узлов появились уникальные ID."""
-        print("\n--- Test 1: Tags Assignment ---")
-
-        # Берем правило (wrap x) -> [S x]
-        rule_wrap = self.prog.rules[0]
-        body = rule_wrap.body # Это [S x]
-
-        print(f"Body: {body}, Tag: {body.tag}")
-
-        self.assertIsNotNone(body.tag, "У корня выражения должен быть тег")
-        self.assertIsInstance(body, Ctr)
-
-        # Проверяем аргумент x внутри [S x]
-        arg_x = body.args[0]
-        print(f"Arg: {arg_x}, Tag: {arg_x.tag}")
-        self.assertIsNotNone(arg_x.tag, "У аргумента тоже должен быть тег")
-
-        # Теги должны быть разными
-        self.assertNotEqual(body.tag, arg_x.tag, "Теги разных узлов должны отличаться")
-
-    def test_2_tags_preserved_on_substitution(self):
+    def test_01_tag_preservation_in_substitute(self):
         """
-        Проверяем, что при подстановке (выполнении шага) тег копируется из кода программы.
+        Проверка: копирует ли substitute теги из исходного выражения?
         """
-        print("\n--- Test 2: Tags Preservation ---")
+        # Создаем переменную x с тегом 500
+        val = Var("x")
+        val.tag = 500
 
-        # Берем шаблон: [S x]
-        template = self.prog.rules[0].body
-        original_tag = template.tag
+        # Создаем конструктор [S x]
+        # У S тег 10
+        inner_var = Var("x") # переменная в паттерне
+        pattern_expr = Ctr("S", [inner_var])
+        pattern_expr.tag = 10
 
-        # Создаем значение для подстановки: x = [Z]
-        # Допустим, это [Z] пришло из другого места и у него свой тег 999
-        val_z = Ctr("Z", [], tag=999)
-        bindings = {"x": val_z}
+        # Делаем подстановку {x: val} в [S x]
+        res = substitute(pattern_expr, {"x": val})
 
-        # Выполняем подстановку: [S x] {x: [Z]} -> [S [Z]]
-        result = substitute(template, bindings)
+        # Проверяем результат: [S x]
+        # Тег самого S должен быть 10, тег вложенного x должен быть 500
+        self.assertEqual(res.tag, 10, "Тег конструктора потерян при подстановке")
+        self.assertEqual(res.args[0].tag, 500, "Тег подставленной переменной потерян")
 
-        print(f"Template Tag: {original_tag}")
-        print(f"Result Tag:   {result.tag}")
-        print(f"Result Child Tag: {result.args[0].tag}")
+    def test_02_dangerous_criteria_strict(self):
+        """
+        Проверка: критерий научника (надмножество и рост).
+        """
+        # bag_new >= bag_old
+        old = Counter({1: 1, 2: 1})
 
-        # 1. Тег корня результата должен совпадать с тегом шаблона ([S])
-        self.assertEqual(result.tag, original_tag,
-                         "Ошибка! Тег конструктора S должен сохраниться из исходной программы!")
+        # 1. Равно - не опасно (это для Folding)
+        self.assertFalse(TagBag.is_dangerous(old, Counter({1: 1, 2: 1})))
 
-        # 2. Тег аргумента должен сохраниться от значения ([Z])
-        self.assertEqual(result.args[0].tag, 999,
-                         "Ошибка! Тег подставленного значения Z должен сохраниться!")
+        # 2. Надмножество (тег 1 вырос) - ОПАСНО
+        self.assertTrue(TagBag.is_dangerous(old, Counter({1: 2, 2: 1})))
 
-    def test_3_complex_structure_tags(self):
-        """Проверяем теги в сложной структуре [Cons x [Nil]]"""
-        print("\n--- Test 3: Complex Structure ---")
+        # 3. Появился новый тег, старые на месте - ОПАСНО (надмножество)
+        self.assertTrue(TagBag.is_dangerous(old, Counter({1: 1, 2: 1, 3: 1})))
 
-        # Берем правило (makeList x) -> [Cons x [Nil]]
-        rule_list = self.prog.rules[1]
-        body = rule_list.body
+        # 4. Один пропал - НЕ ОПАСНО
+        self.assertFalse(TagBag.is_dangerous(old, Counter({1: 10})))
 
-        # body = Cons (tag A)
-        #   args[0] = x (tag B)
-        #   args[1] = Nil (tag C)
+    def test_03_supercompiler_integration(self):
+        """
+        Проверка: видит ли Supercompiler опасного предка?
+        """
+        # Создаем минимальную корректную программу, чтобы SC не падал
+        # fun (f [Nat]) -> [Nat] : (f x) -> [S x] .
+        nat_type = TypeExpr("Nat", [])
+        sig = FunSig("f", [nat_type], nat_type)
+        prog = Program(rules=[], types=[], signatures=[sig])
 
-        tag_cons = body.tag
-        tag_x = body.args[0].tag
-        tag_nil = body.args[1].tag
+        sc = Supercompiler(prog, strategy="TAG")
 
-        # Все теги должны быть уникальны
-        tags = {tag_cons, tag_x, tag_nil}
-        self.assertEqual(len(tags), 3, "Все узлы должны иметь уникальные теги")
+        # Эмулируем два узла
+        # alpha: (f a) с тегом 1
+        expr_alpha = FCall("f", [Var("a")])
+        expr_alpha.tag = 1
+        node_alpha = sc._create_node(expr_alpha, {"a": nat_type})
 
-        # Подставляем x -> [Z] (tag 100)
-        val_z = Ctr("Z", [], tag=100)
-        res = substitute(body, {"x": val_z})
+        # beta: (f [S a]) где f имеет тег 1, а S имеет тег 2
+        s_ctr = Ctr("S", [Var("a")])
+        s_ctr.tag = 2
+        expr_beta = FCall("f", [s_ctr])
+        expr_beta.tag = 1
+        node_beta = sc._create_node(expr_beta, {"a": nat_type})
 
-        # Проверяем, что структура сохранила свои теги
-        self.assertEqual(res.tag, tag_cons)       # Cons
-        self.assertEqual(res.args[1].tag, tag_nil) # Nil
-        self.assertEqual(res.args[0].tag, 100)     # Z (вставленный)
+        # Связываем их
+        node_beta.parent = node_alpha
+
+        # Ищем предка
+        found = sc._find_embedding_ancestor(node_beta)
+        self.assertIs(found, node_alpha, "SC должен найти предка по мешку тегов")
+
+    def test_04_tagger_uniqueness(self):
+        """
+        Проверка: дает ли Tagger разные теги разным частям выражения?
+        """
+        # fun (f [Nat]) -> [Nat] : (f x) -> [S [S x]] .
+        # В теле [S [S x]] : 2 конструктора S и 1 переменная x. Итого 3 узла.
+        body = Ctr("S", [Ctr("S", [Var("x")])])
+        rule = Rule(Pattern("f", [Var("x")]), body)
+        prog = Program(rules=[rule], types=[], signatures=[])
+
+        Tagger().preprocess(prog)
+
+        tags = []
+        def collect_tags(e):
+            tags.append(e.tag)
+            if hasattr(e, 'args'):
+                for a in e.args: collect_tags(a)
+
+        collect_tags(prog.rules[0].body)
+
+        # Проверяем уникальность
+        self.assertEqual(len(tags), 3)
+        self.assertEqual(len(set(tags)), 3, "Теги в одном правиле должны быть уникальными!")
 
 if __name__ == '__main__':
     unittest.main()
