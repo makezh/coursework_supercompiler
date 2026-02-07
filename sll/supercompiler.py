@@ -8,7 +8,7 @@ from sll.driver import Driver, TransientStep, DecomposeStep, VariantStep, StopSt
 from sll.matching import match, MatchSuccess
 from sll.preprocessor import add_tags, Tagger
 from sll.bag_of_tags import TagBag
-
+from sll.tagging import TagAllocator
 
 
 def _find_renaming_ancestor(node: Node) -> Node | None:
@@ -44,16 +44,20 @@ class Supercompiler:
         self.tree: Optional[Node] = None
         self.strategy = strategy
 
+        # Если выбрана стратегия TAG, нам нужно один раз разметить всю программу
+        self.tag_allocator = None
+        if self.strategy == 'TAG':
+            self.tag_allocator = TagAllocator()
+            self.tag_allocator.process_program(self.program)
+
     def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr]):
         """Строит дерево процессов для заданного выражения.
         start_expr: Начальное выражение для суперкомпиляции.
         start_var_types: Типы переменных начального выражения.
         """
-        if self.strategy == 'TAG':
-            add_tags(self.program)
-            tagger = Tagger()
-            tagger.counter = 100000
-            tagger._tag_expr(start_expr)
+        if self.strategy == 'TAG' and self.tag_allocator is not None:
+            # Размечаем и входное выражение тоже, чтобы у него появились теги
+            self.tag_allocator.process_expr(start_expr)
 
         self.tree = self._create_node(start_expr, start_var_types)
 

@@ -210,7 +210,7 @@ class Driver:
                         # Обновляем аргумент и возвращаем новый вызов
                         new_args = list(expr.args)
                         new_args[i] = nested_next
-                        new_expr = FCall(expr.name, new_args, lineno=expr.lineno)
+                        new_expr = FCall(expr.name, new_args, lineno=expr.lineno, tag=expr.tag)
                         return TransientStep(next_expr=new_expr)
 
                     case VariantStep(branches):
@@ -219,7 +219,7 @@ class Driver:
                         for branch_expr, contraction, branch_var_types in branches:
                             new_args = list(expr.args)
                             new_args[i] = branch_expr
-                            new_call = FCall(expr.name, new_args, lineno=expr.lineno)
+                            new_call = FCall(expr.name, new_args, lineno=expr.lineno, tag=expr.tag)
                             new_branches.append((new_call, contraction, branch_var_types))
                         return VariantStep(branches=new_branches)
 
