@@ -67,34 +67,25 @@ class Supercompiler:
         while unprocessed:
             beta = unprocessed.pop(0)
 
-            # 1. Проверка на зацикливание (Folding / Свертка)
-            # Ищем предка, который "похож" на текущий узел (instance of)
-            # Для простоты 2-го этапа: ищем полное совпадение с точностью до переименования
+            # --- Шаг А: Свертка (Folding/Renaming) ---
+            # Одинаково для обеих стратегий
             ancestor = _find_renaming_ancestor(beta)
             if ancestor:
-                # Нашли! Ставим ссылку назад и не обрабатываем детей
                 beta.back_link = ancestor
                 continue
 
-            # 2. Спрашиваем драйвер: "А что ты можешь сделать?"
-            step = self.driver.drive(beta.expr, beta.var_types)
-
-            # 3. Если это НЕ VariantStep (т.е. однозначный шаг или остановка)
-            # то мы просто выполняем его без проверки свистком!
-            if not isinstance(step, VariantStep):
-                self._drive_node_with_step(beta, step, unprocessed)
+            # --- Шаг Б: Свисток (Whistle) ---
+            # Здесь происходит выбор: HE или TAG
+            dangerous_alpha = self._find_embedding_ancestor(beta)
+            if dangerous_alpha:
+                # Если свисток сработал, обобщаем (MSG)
+                self._generalize(dangerous_alpha, beta, unprocessed)
                 continue
 
-            # 4. А вот если драйвер хочет ВЕТВИТЬСЯ (VariantStep)
-            # Тут проверяем свисток, чтобы не плодить бесконечные ветки
-            dangerous_alpha = self._find_embedding_ancestor(beta)
-
-            if dangerous_alpha:
-                # Обобщаем
-                self._generalize(dangerous_alpha, beta, unprocessed)
-            else:
-                # Все спокойно, ветвимся
-                self._drive_node_with_step(beta, step, unprocessed)
+            # --- Шаг В: Драйвинг ---
+            # Выполняется только если узел безопасен
+            step = self.driver.drive(beta.expr, beta.var_types)
+            self._drive_node_with_step(beta, step, unprocessed)
 
     def _create_node(self, expr: Expr, var_types: Dict[str, TypeExpr]) -> Node:
         """Создает узел и сразу считает мешок тегов, если нужно."""
@@ -195,7 +186,7 @@ class Supercompiler:
             val_expr = res.sub1[v_name]
 
             # Создаем ребенка.
-            child = Node(val_expr, var_types=alpha.var_types.copy())
+            child = self._create_node(val_expr, var_types=alpha.var_types.copy())
 
             # Используем поле contraction, чтобы запомнить имя переменной let-связывания
             # (var_name='v1', pattern=None)
