@@ -32,8 +32,11 @@ def main():
                         help="Whistle strategy: HE (Homeomorphic Embedding) or TAG (Bag of Tags)")
     parser.add_argument("-g", "--gen", choices=['TOP', 'BOTTOM'], default='TOP',
                     help="Generalization type: TOP (rewrite ancestor) or BOTTOM (rewrite current)")
+    parser.add_argument("-d", "--dev", choices=['ON', 'OFF'], default='OFF',
+                    help="Developer mode: ON (show tags in graph) or OFF (hide tags)")
 
     args = parser.parse_args()
+    DEV_MODE = (args.dev == 'ON')
 
     # --- 1. Поиск входного файла ---
     input_path = args.file
@@ -135,7 +138,7 @@ def main():
     out_path_base = os.path.join(OUTPUT_DIR, args.out)
 
     print(f"--- Exporting Graph to {OUTPUT_DIR}/ ---")
-    dot_code = to_dot(sc.tree)
+    dot_code = to_dot(sc.tree, dev_mode=DEV_MODE)
 
     graph_label = (
         f"Expression: {args.expr}\\n"

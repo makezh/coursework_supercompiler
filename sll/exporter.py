@@ -1,6 +1,42 @@
 from sll.process_tree import Node
+from sll.ast_nodes import Var, Ctr, FCall, IntLit, Let, Expr
 
-def to_dot(root: Node) -> str:
+def to_tagged_str(expr: Expr) -> str:
+    """
+    Вспомогательная функция для отображения тегов в графе.
+    Рисует тег в фигурных скобках рядом с именем.
+    """
+    # Обработка виртуального корня гиперцикла
+    if isinstance(expr, FCall) and expr.name == "PROGRAM_FOREST":
+        return "PROGRAM_FOREST"
+
+    # Формируем строку тега, если он есть
+    t = f"{{{expr.tag}}}" if expr.tag is not None else ""
+
+    match expr:
+        case Var(name):
+            return f"{name}{t}"
+
+        case IntLit(val):
+            return f"{val}{t}"
+
+        case Ctr(name, args):
+            if not args:
+                return f"[{name}{t}]"
+            args_str = " ".join(to_tagged_str(arg) for arg in args)
+            return f"[{name}{t} {args_str}]"
+
+        case FCall(name, args):
+            args_str = " ".join(to_tagged_str(arg) for arg in args)
+            return f"({name}{t} {args_str})"
+
+        case Let(vname, val, body):
+            return f"let {vname}{t} = {to_tagged_str(val)} in {to_tagged_str(body)}"
+
+        case _:
+            return str(expr)
+
+def to_dot(root: Node, dev_mode=False) -> str:
     """
     Генерирует описание графа в формате DOT (Graphviz).
     """
@@ -33,7 +69,10 @@ def to_dot(root: Node) -> str:
 
         # 1. Описание самого узла
         # Экранируем кавычки и скобки для DOT
-        label = str(node.expr).replace('"', '\\"')
+        if dev_mode:
+            label = to_tagged_str(node.expr).replace('"', '\\"')
+        else:
+            label = str(node.expr).replace('"', '\\"')
         lines.append(f'    {uid} [label="{label}", shape=box];')
 
         # 2. Ссылка назад (Folding)
