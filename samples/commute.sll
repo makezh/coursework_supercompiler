@@ -1,0 +1,15 @@
+type [Nat] : Z | S [Nat] .
+type [Bool] : True | False .
+
+fun (add [Nat] [Nat]) -> [Nat] :
+    (add [S x] y) -> [S (add x y)]
+  | (add [Z] y) -> y .
+
+fun (eq [Nat] [Nat]) -> [Bool] :
+    (eq [Z] [Z]) -> [True]
+  | (eq [S x] [S y]) -> (eq x y)
+  | (eq x y) -> [False] .
+
+<< x + 1 = 1 + x >>
+fun (main [Nat]) -> [Bool] :
+    (main x) -> (eq (add x [S [Z]]) (add [S [Z]] x)) .

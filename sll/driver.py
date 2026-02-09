@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple, Dict
 
 from sll.ast_nodes import Expr, Var, Ctr, FCall, Program, Pattern, IntLit, TypeExpr
 from sll.matching import match as match_term, substitute, \
-    MatchSuccess, MatchNarrowing, MatchFail  # Переименовал match, чтобы не путать с match/case
+    MatchSuccess, MatchNarrowing, MatchFail
 from sll.process_tree import Contraction
 
 
@@ -93,10 +93,16 @@ class Driver:
         """
         Rule-Based Driving для вызова функции.
         """
-        branches = []
-
-        # 1. Ищем правила для этой функции
         rules = [r for r in self.program.rules if r.pattern.name == expr.name]
+
+        # Проверяем, не являются ли аргументы вызовами функций
+        # в тех позициях, где правила ожидают конструкторы.
+        # Если да — уходим в Nested Driving, чтобы "выдавить" конструкторы наружу.
+        for rule in rules:
+            for i, p in enumerate(rule.pattern.params):
+                if not isinstance(p, Var) and isinstance(expr.args[i], FCall):
+                    return self._drive_nested(expr, var_types)
+        branches = []
 
         for rule in rules:
             pat_dummy = FCall("dummy", rule.pattern.params)
@@ -173,14 +179,6 @@ class Driver:
         # Делаем подстановку в исходное выражение
         new_expr = substitute(expr, bindings)
 
-        # 4. Пытаемся сразу редуцировать (Transient Step)
-        # f([Z]) -> body
-        # Для этого нам нужно снова вызвать match (упрощенно) или рекурсивно _drive_call.
-        # Но чтобы не усложнять, мы просто вернем new_expr.
-        # На СЛЕДУЮЩЕМ шаге драйвер увидит f([Z]) и сделает TransientStep.
-        # (Так работает SPSC Lite).
-
-        # Но чтобы было красиво, попробуем редуцировать здесь:
         final_expr = new_expr
         # Ищем правило, которое теперь точно подойдет
         for rule in self.program.rules:
@@ -197,34 +195,31 @@ class Driver:
 
 
     def _drive_nested(self, expr: FCall, var_types: Dict[str, TypeExpr]) -> DriveStep:
-        """
-        Ищет первый вложенный вызов функции в аргументах expr и прогоняет его через драйвер.
-        Возвращает TransientStep с обновленным выражением.
-        """
         for i, arg in enumerate(expr.args):
             if isinstance(arg, FCall):
                 inner_step = self.drive(arg, var_types)
 
                 match inner_step:
                     case TransientStep(next_expr=nested_next):
-                        # Обновляем аргумент и возвращаем новый вызов
                         new_args = list(expr.args)
                         new_args[i] = nested_next
-                        new_expr = FCall(expr.name, new_args, lineno=expr.lineno, tag=expr.tag)
-                        return TransientStep(next_expr=new_expr)
+                        return TransientStep(FCall(expr.name, new_args, lineno=expr.lineno, tag=expr.tag))
 
                     case VariantStep(branches):
-                        # Выносим ветвление наружу
                         new_branches = []
-                        for branch_expr, contraction, branch_var_types in branches:
-                            new_args = list(expr.args)
-                            new_args[i] = branch_expr
-                            new_call = FCall(expr.name, new_args, lineno=expr.lineno, tag=expr.tag)
-                            new_branches.append((new_call, contraction, branch_var_types))
+                        for _, contraction, branch_var_types in branches:
+
+                            # Извлекаем информацию о сужении: какую переменную на какой паттерн меняем
+                            v_name = contraction.var_name
+                            pat = contraction.pattern
+
+                            constr_expr = Ctr(pat.name, pat.params)
+
+                            # Применяем подстановку {x: [S v2]} ко всему выражению
+                            global_branch_expr = substitute(expr, {v_name: constr_expr})
+
+                            # Добавляем обновленное выражение в ветку
+                            new_branches.append((global_branch_expr, contraction, branch_var_types))
+
                         return VariantStep(branches=new_branches)
-
-                    case _:
-                        pass
-
-        # Если не нашли вложенных вызовов для продвижения, останавливаемся
         return StopStep()

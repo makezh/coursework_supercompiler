@@ -41,7 +41,6 @@ class Supercompiler:
     def __init__(self, program: Program, strategy: str = "HE", gen_type: str = "TOP"):
         self.program = program
         self.driver = Driver(program)
-        # Храним все деревья гиперцикла: {выражение_строкой: корень_дерева}
         self.hypercycle_roots: Dict[str, Node] = {}
         self.tree: Optional[Node] = None
         self.strategy = strategy
@@ -77,7 +76,15 @@ class Supercompiler:
                 beta.back_link = ancestor
                 continue
 
-            # --- Шаг Б: Свисток (Whistle) ---
+            # --- Шаг Б: Прогонка (Driving) ---
+            step = self.driver.drive(beta.expr, beta.var_types)
+
+            # Если это простое упрощение (TransientStep) — делаем его сразу
+            if isinstance(step, TransientStep):
+                self._drive_node_with_step(beta, step, unprocessed)
+                continue
+
+            # --- Шаг В: Свисток (Whistle) ---
             # Здесь происходит выбор: HE или TAG
             dangerous_alpha = self._find_embedding_ancestor(beta)
             if dangerous_alpha:
@@ -89,9 +96,6 @@ class Supercompiler:
                     self._generalize_bottom(dangerous_alpha, beta, unprocessed)
                 continue
 
-            # --- Шаг В: Драйвинг ---
-            # Выполняется только если узел безопасен
-            step = self.driver.drive(beta.expr, beta.var_types)
             self._drive_node_with_step(beta, step, unprocessed)
 
     def _create_node(self, expr: Expr, var_types: Dict[str, TypeExpr]) -> Node:
@@ -133,6 +137,9 @@ class Supercompiler:
             return None
 
         for alpha in node.ancestors():
+            if alpha.parent is None or alpha.expr.name == "PROGRAM_FOREST":
+                continue
+
             # Сравниваем только FCall с FCall
             if not isinstance(alpha.expr, FCall):
                 continue
