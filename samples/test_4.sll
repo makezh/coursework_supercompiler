@@ -1,0 +1,18 @@
+type [List x] : Cons x [List x] | Nil.
+type [Letter] : A | B | C | D.
+
+fun (fab [List [Letter]]) -> [List [Letter]]:
+
+(fab [Cons [A] xs]) -> [Cons [B] (fab xs)] |
+(fab [Cons x xs]) -> [Cons x (fab xs)] |
+(fab [Nil]) -> [Nil] .
+
+fun (fbc [List [Letter]]) -> [List [Letter]]:
+
+(fbc [Cons [B] xs]) -> [Cons [C] (fbc xs)] |
+(fbc [Cons x xs]) -> [Cons x (fbc xs)] |
+(fbc [Nil]) -> [Nil] .
+
+fun (fabc [List [Letter]]) -> [List [Letter]]:
+
+(fabc xs) -> (fbc (fab xs)).

@@ -17,3 +17,13 @@ fun (eq [Nat] [Nat]) -> [Bool] :
     (eq [Z] [Z]) -> [True]
   | (eq [S x] [S y]) -> [False]
   | (eq [S x] [S y]) -> (eq x y) .
+
+<< 4а. Умножение чисел >>
+fun (mul1 [Nat] [Nat]) -> [Nat]:
+    (mul1 [Z] y) -> [Z]
+  | (mul1 [S x] y) -> (add y (mul1 x y)).
+
+<< 4б. Умножение чисел >>
+fun (mul2 [Nat] [Nat]) -> [Nat]:
+    (mul2 [Z] y) -> [Z]
+  | (mul2 [S x] y) -> (add (mul2 x y) y).

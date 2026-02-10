@@ -1,0 +1,17 @@
+digraph ProcessTree {
+  label="Expression: (xeqx1 x)\nWhistle Strategy: HE | Gen Type: TOP";
+  labelloc="t";
+  fontsize=20;
+  fontname="Arial";
+
+    node [fontname="Courier New"];
+    edge [fontname="Courier New"];
+    n0 [label="(xeqx1 x)", shape=box];
+    n0 -> n1 [label=""];
+    n1 [label="(eq x [S x])", shape=box];
+    n1 -> n2 [label="x -> (Z )"];
+    n1 -> n3 [label="x -> (S v1)"];
+    n2 [label="[False]", shape=box];
+    n3 [label="(eq v1 [S v1])", shape=box];
+    n3 -> n1 [style=dashed, color=red, label="Folding"];
+}
