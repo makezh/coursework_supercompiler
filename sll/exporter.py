@@ -59,6 +59,8 @@ def to_dot(root: Node, dev_mode=False) -> str:
     node_ids[id(root)] = f"n{counter}"
     counter += 1
 
+    hyper_roots = getattr(root, 'hypercycle_roots_values', [])
+
     while queue:
         node = queue.pop(0)
         uid = node_ids[id(node)]
@@ -67,13 +69,21 @@ def to_dot(root: Node, dev_mode=False) -> str:
             continue
         processed.add(id(node))
 
+        is_ref = getattr(node, 'is_basis_ref', False)
+
+        style_attr = ""
+        if is_ref:
+            # Та самая синяя заливка
+            style_attr = ', style="filled", fillcolor="lightcyan", color="blue", penwidth=2.0'
+
         # 1. Описание самого узла
         # Экранируем кавычки и скобки для DOT
         if dev_mode:
             label = to_tagged_str(node.expr).replace('"', '\\"')
         else:
             label = str(node.expr).replace('"', '\\"')
-        lines.append(f'    {uid} [label="{label}", shape=box];')
+
+        lines.append(f'    {uid} [label="{label}", shape=box{style_attr}];')
 
         # 2. Ссылка назад (Folding)
         if node.back_link:

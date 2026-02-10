@@ -52,6 +52,18 @@ class Supercompiler:
             self.tag_allocator = TagAllocator()
             self.tag_allocator.process_program(self.program)
 
+    def _find_global_root(self, node: Node) -> Node | None:
+        """
+        Ищет, совпадает ли узел с одним из корней в лесу базисных конфигураций.
+        """
+        for root in self.hypercycle_roots.values():
+            if node is root:
+                continue
+
+            if _is_renaming(node.expr, root.expr):
+                return root
+        return None
+
     def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr]):
         """Строит дерево процессов для заданного выражения.
         start_expr: Начальное выражение для суперкомпиляции.
@@ -267,11 +279,34 @@ class Supercompiler:
 
         self.hypercycle_roots = processed_configs
         self.tree = processed_configs[str(start_expr)]
+
+        self._prune_forest()
         forest_root = Node(FCall("PROGRAM_FOREST", []), {})
+
         for expr_str, root_node in self.hypercycle_roots.items():
             forest_root.add_child(root_node)
 
         self.tree = forest_root
+
+    def _prune_forest(self):
+        """
+        Проходит по всем построенным деревьям и обрезает ветки,
+        которые совпадают с корнями других деревьев.
+        """
+        print("--- Pruning Forest ---")
+        for root_node in self.hypercycle_roots.values():
+            self._prune_node_recursive(root_node)
+
+    def _prune_node_recursive(self, node: Node):
+        global_root = self._find_global_root(node)
+
+        if global_root:
+            node.is_basis_ref = True
+            node.children = []
+            return
+
+        for child in list(node.children):
+            self._prune_node_recursive(child)
 
     def _find_all_backlink_targets(self, root: Node) -> List[Node]:
         """Собирает все узлы, на которые КТО-ТО ссылается через back_link."""
