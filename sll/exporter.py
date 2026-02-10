@@ -59,8 +59,6 @@ def to_dot(root: Node, dev_mode=False) -> str:
     node_ids[id(root)] = f"n{counter}"
     counter += 1
 
-    hyper_roots = getattr(root, 'hypercycle_roots_values', [])
-
     while queue:
         node = queue.pop(0)
         uid = node_ids[id(node)]
@@ -90,7 +88,7 @@ def to_dot(root: Node, dev_mode=False) -> str:
             target_id = node_ids.get(id(node.back_link))
             if target_id:
                 lines.append(f'    {uid} -> {target_id} [style=dashed, color=red, label="Folding"];')
-            continue # Детей у свернутого узла нет
+            continue
 
         # 3. Дети
         for child in node.children:
