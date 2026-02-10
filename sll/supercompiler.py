@@ -298,6 +298,8 @@ class Supercompiler:
             self._prune_node_recursive(root_node)
 
     def _prune_node_recursive(self, node: Node):
+        if node.back_link:
+            return
         global_root = self._find_global_root(node)
 
         if global_root:
