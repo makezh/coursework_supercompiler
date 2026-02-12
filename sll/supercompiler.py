@@ -149,7 +149,7 @@ class Supercompiler:
             return None
 
         for alpha in node.ancestors():
-            if alpha.parent is None or alpha.expr.name == "PROGRAM_FOREST":
+            if alpha.expr.name == "PROGRAM_FOREST":
                 continue
 
             # Сравниваем только FCall с FCall
