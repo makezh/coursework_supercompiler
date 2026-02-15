@@ -50,6 +50,7 @@ def to_dot(root: Node, dev_mode=False) -> str:
     # Используем id() объекта, чтобы различать узлы
     node_ids = {}
     counter = 0
+    aux_counter = 0
 
     # Очередь для обхода (BFS)
     queue = [root]
@@ -112,7 +113,57 @@ def to_dot(root: Node, dev_mode=False) -> str:
                     # Обобщение: let v = ...
                     edge_label = f"let {v} = {to_tagged_str(child.contraction.value)}"
 
-            lines.append(f'    {uid} -> {child_id} [label="{edge_label}"];')
+
+            is_branch_edge = bool(child.contraction and child.contraction.pattern)
+            from_id = uid
+
+            if getattr(child, "driven_rule", None) is not None:
+                aux_counter += 1
+                drive_id = f"drv{aux_counter}"
+
+                # подпись: DRIVE + левая часть правила
+                drive_label = f"DRIVE\\n{str(child.driven_rule)}".replace('"', '\\"')
+
+                lines.append(
+                    f'    {drive_id} [label="{drive_label}", shape=ellipse, style="filled", '
+                    f'fillcolor="lavender"];'
+                )
+
+                branch_label = edge_label if is_branch_edge else ""
+                lines.append(f'    {uid} -> {drive_id} [label="{branch_label}"];')
+                from_id = drive_id
+
+            if getattr(child, "gen_result", None) is not None:
+                aux_counter += 1
+                gen_id = f"gen{aux_counter}"
+
+                # Короткие строки (без тегов или с тегами — как тебе удобнее)
+                if dev_mode:
+                    a = to_tagged_str(child.gen_alpha) if child.gen_alpha else "?"
+                    g = to_tagged_str(child.gen_result)
+                else:
+                    a = str(child.gen_alpha) if child.gen_alpha else "?"
+                    g = str(child.gen_result)
+
+                gen_label = (
+                    "GEN\\n"
+                    f"α: {a}\\n"
+                    f"gen: {g}"
+                ).replace('"', '\\"')
+
+                # Ромбик Обобщения
+                lines.append(
+                    f'    {gen_id} [label="{gen_label}", shape=diamond, style="filled", '
+                    f'fillcolor="lightyellow", color="orange"];'
+                )
+
+                branch_label = edge_label if is_branch_edge else ""
+                lines.append(f'    {from_id} -> {gen_id} [label="{branch_label}"];')
+                from_id = gen_id
+
+            dup_label = edge_label if is_branch_edge else edge_label
+            lines.append(f'    {from_id} -> {child_id} [label="{dup_label}"];')
+
 
     lines.append("}")
     return "\n".join(lines)

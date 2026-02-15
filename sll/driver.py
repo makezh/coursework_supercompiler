@@ -37,6 +37,7 @@ class DriveStep: pass
 @dataclass
 class TransientStep(DriveStep):
     next_expr: Expr
+    rule_pat: Optional[Pattern] = None
 
 
 @dataclass
@@ -47,7 +48,7 @@ class DecomposeStep(DriveStep):
 @dataclass
 class VariantStep(DriveStep):
     # Возвращаем не только выражение ветки, но и новые типы для нее
-    branches: List[Tuple[Expr, Contraction, Dict[str, TypeExpr]]]
+    branches: List[Tuple[Expr, Contraction, Dict[str, TypeExpr], Optional[Pattern]]]
 
 
 @dataclass
@@ -121,7 +122,7 @@ class Driver:
 
                     # Если препятствий не было — редуцируем
                     new_expr = substitute(rule.body, bindings)
-                    return TransientStep(next_expr=new_expr)
+                    return TransientStep(next_expr=new_expr, rule_pat=rule.pattern)
 
                 case MatchNarrowing(var_name, constr_name, _):
                     # Нашли переменную для сужения
@@ -142,7 +143,7 @@ class Driver:
         return self._drive_nested(expr, var_types)
 
     def _create_branch(self, expr: FCall, var_name: str, constr_name: str, var_types: Dict[str, TypeExpr]) -> Optional[
-        Tuple[Expr, Contraction, Dict[str, TypeExpr]]]:
+        Tuple[Expr, Contraction, Dict[str, TypeExpr], Optional[Pattern]]]:
         """
         Создает одну ветку для VariantStep.
         заменяет переменную var_name в expr на конструктор constr_name с новыми переменными.
@@ -180,6 +181,7 @@ class Driver:
         new_expr = substitute(expr, bindings)
 
         final_expr = new_expr
+        applied_pat = None
         # Ищем правило, которое теперь точно подойдет
         for rule in self.program.rules:
             if rule.pattern.name == expr.name:
@@ -188,10 +190,11 @@ class Driver:
                 if isinstance(match_term(pat_dummy, call_dummy), MatchSuccess):
                     match_res = match_term(pat_dummy, call_dummy)  # Получаем bindings
                     final_expr = substitute(rule.body, match_res.bindings)
+                    applied_pat = rule.pattern
                     break
 
         contraction = Contraction(var_name, Pattern(constr_name, fresh_vars))
-        return final_expr, contraction, new_branch_types
+        return final_expr, contraction, new_branch_types, applied_pat
 
 
     def _drive_nested(self, expr: FCall, var_types: Dict[str, TypeExpr]) -> DriveStep:
@@ -207,7 +210,7 @@ class Driver:
 
                     case VariantStep(branches):
                         new_branches = []
-                        for _, contraction, branch_var_types in branches:
+                        for _, contraction, branch_var_types, applied_pat in branches:
 
                             # Извлекаем информацию о сужении: какую переменную на какой паттерн меняем
                             v_name = contraction.var_name
@@ -219,7 +222,7 @@ class Driver:
                             global_branch_expr = substitute(expr, {v_name: constr_expr})
 
                             # Добавляем обновленное выражение в ветку
-                            new_branches.append((global_branch_expr, contraction, branch_var_types))
+                            new_branches.append((global_branch_expr, contraction, branch_var_types, applied_pat))
 
                         return VariantStep(branches=new_branches)
         return StopStep()

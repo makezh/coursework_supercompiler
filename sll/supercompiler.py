@@ -123,8 +123,10 @@ class Supercompiler:
         match step:
             case StopStep():
                 return
-            case TransientStep(next_expr):
+            case TransientStep(next_expr, rule_pat):
                 child = self._create_node(next_expr, var_types=node.var_types.copy())
+                child.driven_from = node.expr
+                child.driven_rule = rule_pat
                 node.add_child(child)
                 new_children.append(child)
             case DecomposeStep(parts):
@@ -133,8 +135,9 @@ class Supercompiler:
                     node.add_child(child)
                     new_children.append(child)
             case VariantStep(branches):
-                for expr_branch, contraction, branch_types in branches:
+                for expr_branch, contraction, branch_types, applied_pat in branches:
                     child = self._create_node(expr_branch, var_types=branch_types)
+                    child.driven_rule = applied_pat
                     node.add_child(child, contraction)
                     new_children.append(child)
 
@@ -210,6 +213,11 @@ class Supercompiler:
             beta.back_link = alpha
             return
 
+        old_alpha_expr = alpha.expr
+        alpha.gen_alpha = old_alpha_expr
+        alpha.gen_beta = beta.expr
+        alpha.gen_result = res.gen
+
         # 2. Обновляем узел alpha
         # print(f"GENERALIZATION: {alpha.expr} AND {beta.expr} -> {res.gen}")
         alpha.expr = res.gen
@@ -244,6 +252,11 @@ class Supercompiler:
         Обобщаем текущий узел beta относительно предка alpha.
         """
         res = msg(alpha.expr, beta.expr)
+
+        old_beta_expr = beta.expr
+        beta.gen_alpha = alpha.expr
+        beta.gen_beta = old_beta_expr
+        beta.gen_result = res.gen
 
         # Обновляем выражение в ТЕКУЩЕМ узле beta
         beta.expr = res.gen

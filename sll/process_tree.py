@@ -36,6 +36,13 @@ class Node:
     # Ссылка назад (для сворачивания графа)
     back_link: Optional['Node'] = None
 
+    driven_from: Optional[Expr] = None
+    driven_rule: Optional[Pattern] = None
+
+    gen_alpha: Optional[Expr] = None   # что было до обобщения
+    gen_beta: Optional[Expr] = None    # на чем свистнули
+    gen_result: Optional[Expr] = None  # во что обобщили
+
     def add_child(self, node: 'Node', contraction: Optional[Contraction] = None):
         node.parent = self
         node.contraction = contraction
