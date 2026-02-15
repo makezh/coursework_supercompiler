@@ -77,19 +77,24 @@ class Supercompiler:
 
         # Очередь необработанных узлов
         unprocessed = [self.tree]
-
+        steeeep = 0
         while unprocessed:
             beta = unprocessed.pop(0)
+            steeeep += 1
+            if steeeep == 50:
+                break
 
             # --- Шаг А: Свертка (Folding/Renaming) ---
             # Одинаково для обеих стратегий
             ancestor = _find_renaming_ancestor(beta)
             if ancestor:
                 beta.back_link = ancestor
+                print(f"[FOLD] beta={beta.expr}  -> alpha={ancestor.expr}")
                 continue
 
             # --- Шаг Б: Прогонка (Driving) ---
             step = self.driver.drive(beta.expr, beta.var_types)
+            print(f"[DRIVE] at {beta.expr}  step={type(step).__name__}")
 
             # Если это простое упрощение (TransientStep) — делаем его сразу
             if isinstance(step, TransientStep):
@@ -100,11 +105,14 @@ class Supercompiler:
             # Здесь происходит выбор: HE или TAG
             dangerous_alpha = self._find_embedding_ancestor(beta)
             if dangerous_alpha:
+                print(f"[WHISTLE] alpha={dangerous_alpha.expr}  beta={beta.expr}  strategy={self.strategy}")
                 if self.gen_type == 'TOP':
                     # Классика: рубим дерево сверху
+                    print(f"[GEN] alpha={dangerous_alpha.expr}  beta={beta.expr} gen_type={self.gen_type}")
                     self._generalize(dangerous_alpha, beta, unprocessed)
                 else:
                     # Абрамов: перестраиваем текущий узел снизу
+                    print(f"[GEN] alpha={dangerous_alpha.expr}  beta={beta.expr} gen_type={self.gen_type}[pe]adeijf;jwern")
                     self._generalize_bottom(dangerous_alpha, beta, unprocessed)
                 continue
 
@@ -202,8 +210,6 @@ class Supercompiler:
         """
         # 1. Считаем MSG
         res = msg(alpha.expr, beta.expr)
-        # res.gen - обобщенное выражение (с переменными v1, v2...)
-        # res.sub1 - как получить alpha из gen (v1 -> expr1, ...)
 
         # Если обобщенное выражение совпадает с предком (с точностью до имен),
         # то нет смысла перестраивать дерево. Это просто цикл.
@@ -239,8 +245,6 @@ class Supercompiler:
             # Создаем ребенка.
             child = self._create_node(val_expr, var_types=alpha.var_types.copy())
 
-            # Используем поле contraction, чтобы запомнить имя переменной let-связывания
-            # (var_name='v1', pattern=None)
             let_info = Contraction(var_name=v_name, pattern=None, value=val_expr)
 
             alpha.add_child(child, let_info)
@@ -271,7 +275,7 @@ class Supercompiler:
             child = self._create_node(val_expr, var_types=beta.var_types.copy())
 
             # Помечаем ребро как let-связывание
-            let_info = Contraction(var_name=v_name, pattern=None)
+            let_info = Contraction(var_name=v_name, pattern=None, value=val_expr)
             beta.add_child(child, let_info)
             unprocessed.append(child)
 
@@ -281,7 +285,7 @@ class Supercompiler:
         Итеративно строит графы для всех базисных конфигураций.
         """
         # Набор выражений, которые мы уже суперкомпилировали (базисные конфигурации)
-        processed_configs = {} # {str(expr): Node}
+        processed_configs = {}
 
         # Очередь на суперкомпиляцию. Первым идет стартовое выражение.
         queue = [(start_expr, start_var_types)]

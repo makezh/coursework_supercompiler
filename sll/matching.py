@@ -40,6 +40,17 @@ class MatchFail(MatchResult):
     """Решений нет (конфликт конструкторов)."""
     pass
 
+def merge_bindings(dst: Dict[str, Expr], src: Dict[str, Expr]) -> Optional[Dict[str, Expr]]:
+    """
+    Аккуратно сливает bindings: если ключ уже был и значение другое — конфликт.
+    Возвращает dst или None при конфликте.
+    """
+    for k, v in src.items():
+        if k in dst and dst[k] != v:
+            return None
+        dst[k] = v
+    return dst
+
 
 def match(pattern: Expr, expr: Expr) -> MatchResult:
     """
@@ -81,7 +92,8 @@ def match(pattern: Expr, expr: Expr) -> MatchResult:
                                 return res # Пробрасываем сужение вверх
 
                             case MatchSuccess(bindings):
-                                total_bindings.update(bindings) # Собираем все подстановки
+                                if merge_bindings(total_bindings, bindings) is None:
+                                    return MatchFail()
 
                     return MatchSuccess(bindings=total_bindings)
 
@@ -110,7 +122,9 @@ def match(pattern: Expr, expr: Expr) -> MatchResult:
                             case MatchNarrowing(_, _, _):
                                 return res
                             case MatchSuccess(bindings):
-                                total_bindings.update(bindings)
+                                if merge_bindings(total_bindings, bindings) is None:
+                                    return MatchFail()
+
                     return MatchSuccess(bindings=total_bindings)
                 case _:
                     return MatchFail()

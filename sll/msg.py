@@ -3,6 +3,25 @@ from dataclasses import dataclass
 from typing import Dict, Tuple
 from sll.ast_nodes import Expr, Var, Ctr, FCall, IntLit
 
+def _replace_var(expr: Expr, old: str, new: str) -> Expr:
+    """Заменяет все Var(old) на Var(new) внутри expr."""
+    match expr:
+        case Var(name) if name == old:
+            return Var(new)
+
+        case Ctr(name, args):
+            return Ctr(name, [_replace_var(a, old, new) for a in args])
+
+        case FCall(name, args):
+            return FCall(name, [_replace_var(a, old, new) for a in args])
+
+        case IntLit(_):
+            return expr
+
+        case _:
+            return expr
+
+
 @dataclass
 class GenResult:
     """
@@ -34,6 +53,7 @@ class MSGBuilder:
         self.counter = 0
         self.memo = {}
         gen, s1, s2 = self._gen_recursive(t1, t2)
+        gen, s1, s2 = self._merge_duplicate_holes(gen, s1, s2)
         return GenResult(gen, s1, s2)
 
     def _gen_recursive(self, t1: Expr, t2: Expr) -> Tuple[Expr, Dict[str, Expr], Dict[str, Expr]]:
@@ -93,6 +113,29 @@ class MSGBuilder:
             return Ctr(name, new_args), full_s1, full_s2
         else:
             return FCall(name, new_args), full_s1, full_s2
+
+    def _merge_duplicate_holes(self, gen: Expr, s1: Dict[str, Expr], s2: Dict[str, Expr]):
+        """
+        Сливает разные переменные v_i, v_j в одну
+        """
+        groups: Dict[tuple, list[str]] = {}
+        for v in list(s1.keys()):
+            key = (str(s1[v]), str(s2.get(v)))
+            groups.setdefault(key, []).append(v)
+
+        for _, vars_ in groups.items():
+            if len(vars_) <= 1:
+                continue
+
+            vars_.sort(key=natural_key)
+            keep = vars_[0]
+
+            for old in vars_[1:]:
+                gen = _replace_var(gen, old, keep)
+                s1.pop(old, None)
+                s2.pop(old, None)
+
+        return gen, s1, s2
 
 
 def msg(t1: Expr, t2: Expr) -> GenResult:

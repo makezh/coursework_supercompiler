@@ -181,20 +181,9 @@ class Driver:
         new_expr = substitute(expr, bindings)
 
         final_expr = new_expr
-        applied_pat = None
-        # Ищем правило, которое теперь точно подойдет
-        for rule in self.program.rules:
-            if rule.pattern.name == expr.name:
-                pat_dummy = FCall("dummy", rule.pattern.params)
-                call_dummy = FCall("dummy", new_expr.args)  # Аргументы уже новые
-                if isinstance(match_term(pat_dummy, call_dummy), MatchSuccess):
-                    match_res = match_term(pat_dummy, call_dummy)  # Получаем bindings
-                    final_expr = substitute(rule.body, match_res.bindings)
-                    applied_pat = rule.pattern
-                    break
 
         contraction = Contraction(var_name, Pattern(constr_name, fresh_vars))
-        return final_expr, contraction, new_branch_types, applied_pat
+        return final_expr, contraction, new_branch_types, None
 
 
     def _drive_nested(self, expr: FCall, var_types: Dict[str, TypeExpr]) -> DriveStep:

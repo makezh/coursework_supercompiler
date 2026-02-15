@@ -1,7 +1,8 @@
 from typing import List, Dict, Tuple
 from sll.ast_nodes import Program, Rule, Pattern, Expr, Var, Ctr, FCall, IntLit
 from sll.process_tree import Node
-from sll.matching import substitute
+from sll.matching import substitute, match, MatchSuccess
+
 
 class Residualizer:
     def __init__(self, tree_root: Node):
@@ -11,8 +12,44 @@ class Residualizer:
         self.f_count = 0
         self.g_count = 0
 
+    def _rewrite_expr(self, expr: Expr) -> Expr:
+        match expr:
+            case Var(_) | IntLit(_):
+                return expr
+
+            case Ctr(name, args):
+                return Ctr(name, [self._rewrite_expr(a) for a in args], lineno=expr.lineno, tag=expr.tag)
+
+            case FCall(_, _):
+                for target in self.node_to_sig.keys():
+                    if not isinstance(target.expr, FCall):
+                        continue
+                    if isinstance(expr, FCall) and target.expr.name != expr.name:
+                        continue
+                    m = match(target.expr, expr)
+
+                    if isinstance(m, MatchSuccess):
+                        return self._call_registered(target, expr)
+
+                return FCall(expr.name, [self._rewrite_expr(a) for a in expr.args], lineno=expr.lineno, tag=expr.tag)
+
+            case _:
+                return expr
+
+
+    def _call_registered(self, target: Node, current_expr: Expr) -> Expr:
+        func_name, params = self.node_to_sig[target]
+
+        m = match(target.expr, current_expr)
+        if not isinstance(m, MatchSuccess):
+            return FCall(func_name, self._get_vars(current_expr))
+
+        args = [m.bindings.get(v.name, v) for v in params]  # важен порядок params
+        return FCall(func_name, args)
+
     def residualize(self) -> Program:
         self._find_functions(self.root)
+
         # Сортировка для детерминизма (по id узла или порядку добавления)
         nodes = list(self.node_to_sig.keys())
         # Можно отсортировать по именам функций для красоты, но не обязательно
@@ -76,45 +113,48 @@ class Residualizer:
                         lhs_params.append(var)
 
                 pat = Pattern(name, lhs_params)
-                body = self._transform(child)
+                body = self._rewrite_expr(self._transform(child))
                 self.rules.append(Rule(pat, body))
         else:
             pat = Pattern(name, params)
             if not node.children:
-                body = node.expr
+                body = self._rewrite_expr(node.expr)
             elif node.children[0].contraction and node.children[0].contraction.pattern is None:
                 # Generalization case
                 bindings = {}
                 for child in node.children:
                     bindings[child.contraction.var_name] = self._transform(child)
-                body = substitute(node.expr, bindings)
+                body = self._rewrite_expr(substitute(node.expr, bindings))
             elif isinstance(node.expr, Ctr):
                 new_args = [self._transform(c) for c in node.children]
                 body = Ctr(node.expr.name, new_args)
             elif len(node.children) == 1:
                 body = self._transform(node.children[0])
             else:
-                body = node.expr
+                body = self._rewrite_expr(node.expr)
             self.rules.append(Rule(pat, body))
 
     def _transform(self, node: Node) -> Expr:
         if node.back_link:
-            target = node.back_link
-            func_name, func_params = self.node_to_sig[target]
-            return FCall(func_name, self._get_vars(node.expr))
+            return self._call_registered(node.back_link, node.expr)
 
         if node in self.node_to_sig:
-            func_name, func_params = self.node_to_sig[node]
-            return FCall(func_name, self._get_vars(node.expr))
+            return self._call_registered(node, node.expr)
 
         if isinstance(node.expr, Ctr) and node.children:
              new_args = [self._transform(c) for c in node.children]
              return Ctr(node.expr.name, new_args)
 
+        if node.children and node.children[0].contraction and node.children[0].contraction.pattern is None:
+            bindings = {}
+            for c in node.children:
+                bindings[c.contraction.var_name] = self._transform(c)
+            return self._rewrite_expr(substitute(node.expr, bindings))
+
         if len(node.children) == 1:
              return self._transform(node.children[0])
 
-        return node.expr
+        return self._rewrite_expr(node.expr)
 
     def _get_vars(self, expr: Expr) -> List[Var]:
         vars_list = []

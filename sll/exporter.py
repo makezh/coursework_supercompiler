@@ -117,7 +117,7 @@ def to_dot(root: Node, dev_mode=False) -> str:
             is_branch_edge = bool(child.contraction and child.contraction.pattern)
             from_id = uid
 
-            if getattr(child, "driven_rule", None) is not None:
+            if dev_mode and getattr(child, "driven_rule", None) is not None:
                 aux_counter += 1
                 drive_id = f"drv{aux_counter}"
 
@@ -133,7 +133,7 @@ def to_dot(root: Node, dev_mode=False) -> str:
                 lines.append(f'    {uid} -> {drive_id} [label="{branch_label}"];')
                 from_id = drive_id
 
-            if getattr(child, "gen_result", None) is not None:
+            if dev_mode and getattr(child, "gen_result", None) is not None:
                 aux_counter += 1
                 gen_id = f"gen{aux_counter}"
 
