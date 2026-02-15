@@ -110,7 +110,7 @@ def to_dot(root: Node, dev_mode=False) -> str:
                     edge_label = f"{v} -> {p}"
                 else:
                     # Обобщение: let v = ...
-                    edge_label = f"let {v}"
+                    edge_label = f"let {v} = {to_tagged_str(child.contraction.value)}"
 
             lines.append(f'    {uid} -> {child_id} [label="{edge_label}"];')
 

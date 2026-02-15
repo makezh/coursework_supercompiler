@@ -26,12 +26,12 @@ class TestMSG(unittest.TestCase):
         res = msg(t1, t2)
         # Ожидаем: v1
         self.assertIsInstance(res.gen, Var)
-        self.assertEqual(res.gen.name, "v1")
+        self.assertEqual(res.gen.name, "h1")
 
         # sub1: v1 -> [Z]
-        self.assertEqual(str(res.sub1['v1']), "[Z]")
+        self.assertEqual(str(res.sub1['h1']), "[Z]")
         # sub2: v1 -> [S x]
-        self.assertEqual(str(res.sub2['v1']), "[S x]")
+        self.assertEqual(str(res.sub2['h1']), "[S x]")
 
     def test_common_structure(self):
         """Совпадение сверху, различие внутри"""
@@ -45,13 +45,13 @@ class TestMSG(unittest.TestCase):
         res = msg(t1, t2)
 
         # Проверяем структуру
-        self.assertEqual(str(res.gen), "[Cons v1 xs]")
+        self.assertEqual(str(res.gen), "[Cons h1 xs]")
 
         # Проверяем подстановки
         # v1 -> [Z]
-        self.assertEqual(str(res.sub1['v1']), "[Z]")
+        self.assertEqual(str(res.sub1['h1']), "[Z]")
         # v1 -> [S x]
-        self.assertEqual(str(res.sub2['v1']), "[S x]")
+        self.assertEqual(str(res.sub2['h1']), "[S x]")
 
     def test_double_conflict(self):
         """Два различия в разных местах"""
@@ -63,10 +63,10 @@ class TestMSG(unittest.TestCase):
         t2 = self._expr("(f [C] [D])")
 
         res = msg(t1, t2)
-        self.assertEqual(str(res.gen), "(f v1 v2)")
+        self.assertEqual(str(res.gen), "(f h1 h2)")
 
-        self.assertEqual(str(res.sub1['v1']), "[A]")
-        self.assertEqual(str(res.sub1['v2']), "[B]")
+        self.assertEqual(str(res.sub1['h1']), "[A]")
+        self.assertEqual(str(res.sub1['h2']), "[B]")
 
     def test_tight_generalization(self):
         """
@@ -91,7 +91,7 @@ class TestMSG(unittest.TestCase):
 
         # Проверяем, что в результате только ДВЕ переменные (v1 и v2), а не 4
         # Текстовое представление должно быть (f v1 v2 v1 v2)
-        self.assertEqual(str(res.gen), "(f v1 v2 v1 v2)")
+        self.assertEqual(str(res.gen), "(f h1 h2 h1 h2)")
 
         # Проверяем количество уникальных ключей в подстановке
         self.assertEqual(len(res.sub1), 2)
@@ -106,7 +106,7 @@ class TestMSG(unittest.TestCase):
         t2 = self._expr("(f a b)")
 
         res = msg(t1, t2)
-        self.assertEqual(str(res.gen), "(f v1 v2)")
+        self.assertEqual(str(res.gen), "(f h1 h2)")
         self.assertEqual(len(res.sub1), 2)
 
     def test_msg_substitute_roundtrip(self):
@@ -119,7 +119,7 @@ class TestMSG(unittest.TestCase):
         res = msg(t1, t2)
 
         # Ожидаем, что MSG нашел одинаковые пары и выдал (f v1 [S v1] v1)
-        self.assertEqual(str(res.gen), "(f v1 [S v1] v1)")
+        self.assertEqual(str(res.gen), "(f h1 [S h1] h1)")
 
         # Проверяем восстановление t1
         t1_recovered = substitute(res.gen, res.sub1)

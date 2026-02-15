@@ -1,6 +1,6 @@
 from typing import Dict, Optional, List
 
-from sll.ast_nodes import Program, Expr, FCall, TypeExpr
+from sll.ast_nodes import Program, Expr, FCall, TypeExpr, Var, IntLit, Ctr
 from sll.he import he
 from sll.msg import msg, natural_key
 from sll.process_tree import Node, Contraction
@@ -145,16 +145,33 @@ class Supercompiler:
         # Мы проверяем свисток только для Вызовов Функций (FCall).
         # Конструкторы (Ctr) безопасны, мы их просто декомпозируем.
         # Если этого не сделать, add(a,b) свистнет на S(add(..)), и мы не дойдем до свертки.
-        if not isinstance(node.expr, FCall):
-            return None
+        def same_head(a, b) -> bool:
+            # не свистим по переменным и числам
+            if isinstance(a, (Var, IntLit)) or isinstance(b, (Var, IntLit)):
+                return False
+
+            # FCall сравниваем только с FCall того же имени
+            if isinstance(a, FCall) and isinstance(b, FCall):
+                return a.name == b.name
+
+            # Ctr сравниваем только с Ctr того же конструктора (S с S, Cons с Cons, ...)
+            if isinstance(a, Ctr) and isinstance(b, Ctr):
+                return a.name == b.name
+
+            return False
+        # if not isinstance(node.expr, FCall):
+        #     return None
 
         for alpha in node.ancestors():
-            if alpha.expr.name == "PROGRAM_FOREST":
+            if getattr(alpha.expr, "name", None) == "PROGRAM_FOREST":
+                continue
+
+            if not same_head(alpha.expr, node.expr):
                 continue
 
             # Сравниваем только FCall с FCall
-            if not isinstance(alpha.expr, FCall):
-                continue
+            # if not isinstance(alpha.expr, FCall):
+            #     continue
 
             is_dangerous = False
 
@@ -216,7 +233,7 @@ class Supercompiler:
 
             # Используем поле contraction, чтобы запомнить имя переменной let-связывания
             # (var_name='v1', pattern=None)
-            let_info = Contraction(var_name=v_name, pattern=None)
+            let_info = Contraction(var_name=v_name, pattern=None, value=val_expr)
 
             alpha.add_child(child, let_info)
             unprocessed.append(child)

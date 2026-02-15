@@ -13,6 +13,7 @@ class Contraction:
     """
     var_name: str
     pattern: Optional[Pattern]
+    value: Optional[Expr] = None
 
 @dataclass(eq=False)
 class Node:

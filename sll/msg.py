@@ -28,7 +28,7 @@ class MSGBuilder:
     def _fresh_var_name(self) -> str:
         """Генерирует следующее имя переменной: v1, v2, v3..."""
         self.counter += 1
-        return f"v{self.counter}"
+        return f"h{self.counter}"
 
     def generalize(self, t1: Expr, t2: Expr) -> GenResult:
         self.counter = 0
