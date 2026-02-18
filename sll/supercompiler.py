@@ -77,12 +77,8 @@ class Supercompiler:
 
         # Очередь необработанных узлов
         unprocessed = [self.tree]
-        steeeep = 0
         while unprocessed:
             beta = unprocessed.pop(0)
-            steeeep += 1
-            if steeeep == 50:
-                break
 
             # --- Шаг А: Свертка (Folding/Renaming) ---
             # Одинаково для обеих стратегий

@@ -51,17 +51,6 @@ class TestBagOfTags(unittest.TestCase):
         self.assertFalse(TagBag.is_dangerous(bag_old, bag_new),
                          "Не должен свистеть: тег 2 исчез, структура изменилась")
 
-    def test_whistle_identical_bags(self):
-        """
-        Не должен свистеть на идентичных мешках.
-        Идентичные случаи — это Folding (свертка), а не опасность зацикливания.
-        """
-        bag_old = Counter({1: 1, 2: 1})
-        bag_new = Counter({1: 1, 2: 1})
-
-        self.assertFalse(TagBag.is_dangerous(bag_old, bag_new),
-                         "Не должен свистеть: мешки идентичны (это случай для свертки)")
-
     def test_whistle_shrink(self):
         """Не должен свистеть, если мешок стал меньше."""
         bag_old = Counter({1: 10})

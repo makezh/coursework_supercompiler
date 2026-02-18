@@ -49,12 +49,4 @@ class TagBag:
         if not bag_old:
             return False
 
-        # 1. Проверяем мультимножественное включение
-        is_superset = (bag_new >= bag_old)
-
-        if not is_superset:
-            return False
-
-        # 2. Если это надмножество, проверяем, вырос ли вес
-        # (чтобы не свистеть на идентичных конфигурациях, их обработает Folding)
-        return bag_new.total() > bag_old.total()
+        return bag_new >= bag_old
