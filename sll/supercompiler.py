@@ -64,7 +64,7 @@ class Supercompiler:
                 return root
         return None
 
-    def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr], max_steps:int = 100):
+    def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr], max_steps:int = 10):
         """Строит дерево процессов для заданного выражения.
         start_expr: Начальное выражение для суперкомпиляции.
         start_var_types: Типы переменных начального выражения.
@@ -135,11 +135,13 @@ class Supercompiler:
             case StopStep():
                 return
             case TransientStep(next_expr, rule_pat):
-                child = self._create_node(next_expr, var_types=node.var_types.copy())
-                child.driven_from = node.expr
-                child.driven_rule = rule_pat
-                node.add_child(child)
-                new_children.append(child)
+                node.driven_from = node.expr
+                node.driven_rule = rule_pat
+                node.expr = next_expr
+
+                if self.strategy == "TAG":
+                    node.bag = TagBag.collect(node.expr)
+
             case DecomposeStep(parts):
                 for part in parts:
                     child = self._create_node(part, var_types=node.var_types.copy())
