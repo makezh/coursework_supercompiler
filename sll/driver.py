@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
 
-from sll.ast_nodes import Expr, Var, Ctr, FCall, Program, Pattern, IntLit, TypeExpr
+from sll.ast_nodes import Expr, Var, Ctr, FCall, Program, Pattern, IntLit, TypeExpr, Let
 from sll.matching import match as match_term, substitute, \
     MatchSuccess, MatchNarrowing, MatchFail
 from sll.process_tree import Contraction
@@ -32,6 +32,12 @@ class NameGen:
 
 @dataclass
 class DriveStep: pass
+
+
+@dataclass
+class LetStep(DriveStep):
+    bindings: List[Tuple[str, Expr]]
+    body: Expr
 
 
 @dataclass
@@ -73,6 +79,11 @@ class Driver:
         Принимает выражение И известные типы переменных (var_types).
         """
         match expr:
+            # 0. Let узлы
+            case Let(bindings, body):
+                print("[DRIVE] LET matched")
+                parts = [val for (_, val) in bindings] + [body]
+                return DecomposeStep(parts=parts)
 
             # 1. Конструктор (Пассивные данные)
             case Ctr(_, args):

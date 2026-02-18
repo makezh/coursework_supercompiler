@@ -30,8 +30,10 @@ def to_tagged_str(expr: Expr) -> str:
             args_str = " ".join(to_tagged_str(arg) for arg in args)
             return f"({name}{t} {args_str})"
 
-        case Let(vname, val, body):
-            return f"let {vname}{t} = {to_tagged_str(val)} in {to_tagged_str(body)}"
+        case Let(bindings, body):
+            # Книжный вид: let ... in ...
+            binds = "; ".join(f"{name} = {to_tagged_str(val)}" for name, val in bindings)
+            return f"(let{t} {binds} in {to_tagged_str(body)})"
 
         case _:
             return str(expr)
@@ -72,8 +74,10 @@ def to_dot(root: Node, dev_mode=False) -> str:
 
         style_attr = ""
         if is_ref:
-            # Та самая синяя заливка
             style_attr = ', style="filled", fillcolor="lightcyan", color="blue", penwidth=2.0'
+        elif isinstance(node.expr, Let):
+            # Let-узлы подсвечиваем как в книжке
+            style_attr = ', style="filled", fillcolor="lightyellow", color="orange", penwidth=2.0'
 
         # 1. Описание самого узла
         # Экранируем кавычки и скобки для DOT

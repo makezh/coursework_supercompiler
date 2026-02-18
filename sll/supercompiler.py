@@ -1,10 +1,10 @@
 from typing import Dict, Optional, List
 
-from sll.ast_nodes import Program, Expr, FCall, TypeExpr, Var, IntLit, Ctr
+from sll.ast_nodes import Program, Expr, FCall, TypeExpr, Var, IntLit, Ctr, Let
 from sll.he import he
 from sll.msg import msg, natural_key
 from sll.process_tree import Node, Contraction
-from sll.driver import Driver, TransientStep, DecomposeStep, VariantStep, StopStep, DriveStep
+from sll.driver import Driver, TransientStep, DecomposeStep, VariantStep, StopStep, DriveStep, LetStep
 from sll.matching import match, MatchSuccess
 from sll.preprocessor import add_tags, Tagger
 from sll.bag_of_tags import TagBag
@@ -100,9 +100,10 @@ class Supercompiler:
             print(f"[DRIVE] at {beta.expr}  step={type(step).__name__}")
 
             # Если это простое упрощение (TransientStep) — делаем его сразу
-            if isinstance(step, TransientStep):
+            while isinstance(step, TransientStep):
                 self._drive_node_with_step(beta, step, unprocessed)
-                continue
+                step = self.driver.drive(beta.expr, beta.var_types)
+                print(f"[DRIVE*] at {beta.expr}  step={type(step).__name__}")
 
             # --- Шаг В: Свисток (Whistle) ---
             # Здесь происходит выбор: HE или TAG
@@ -115,7 +116,7 @@ class Supercompiler:
                     self._generalize(dangerous_alpha, beta, unprocessed)
                 else:
                     # Абрамов: перестраиваем текущий узел снизу
-                    print(f"[GEN] alpha={dangerous_alpha.expr}  beta={beta.expr} gen_type={self.gen_type}[pe]adeijf;jwern")
+                    print(f"[GEN] alpha={dangerous_alpha.expr}  beta={beta.expr} gen_type={self.gen_type}")
                     self._generalize_bottom(dangerous_alpha, beta, unprocessed)
                 continue
 
@@ -134,6 +135,20 @@ class Supercompiler:
         match step:
             case StopStep():
                 return
+
+            case LetStep(bindings, body):
+                # 1) bindings: let h = value
+                for v_name, val_expr in bindings:
+                    child = self._create_node(val_expr, var_types=node.var_types.copy())
+                    let_info = Contraction(var_name=v_name, pattern=None, value=val_expr)
+                    node.add_child(child, let_info)
+                    new_children.append(child)
+
+                # 2) body: обычный ребёнок (без подписи let)
+                body_child = self._create_node(body, var_types=node.var_types.copy())
+                node.add_child(body_child)
+                new_children.append(body_child)
+
             case TransientStep(next_expr, rule_pat):
                 node.driven_from = node.expr
                 node.driven_rule = rule_pat
@@ -238,29 +253,48 @@ class Supercompiler:
 
     def _generalize_bottom(self, alpha: Node, beta: Node, unprocessed: list):
         """
-        Стратегия Абрамова (снизу):
-        Обобщаем текущий узел beta относительно предка alpha.
+        Обобщение снизу
+        если MSG(alpha, beta) вырождается в "дырку" Var(h),
+        то вместо этого строим let-узел по текущему beta-контексту:
+            beta := let h1=e1; h2=e2; ... in f(h1,h2,...)
         """
         res = msg(alpha.expr, beta.expr)
 
+        if isinstance(res.gen, Var) and isinstance(beta.expr, FCall):
+            f_name = beta.expr.name
+            args = beta.expr.args
+
+            bindings = []
+            hole_vars = []
+            for i, arg in enumerate(args, start=1):
+                h = f"h{i}"
+                bindings.append((h, arg))
+                hole_vars.append(Var(h))
+
+            beta.gen_alpha = alpha.expr
+            beta.gen_beta = beta.expr
+            beta.gen_result = Let(bindings=bindings, body=FCall(f_name, hole_vars))
+            unprocessed.insert(0, beta)
+
+            beta.expr = beta.gen_result
+            if self.strategy == "TAG":
+                beta.bag = TagBag.collect(beta.expr)
+            return
+
+        # Обычный путь (когда MSG сохраняет структуру, не дырка)
         old_beta_expr = beta.expr
         beta.gen_alpha = alpha.expr
         beta.gen_beta = old_beta_expr
         beta.gen_result = res.gen
 
-        # Обновляем выражение в ТЕКУЩЕМ узле beta
         beta.expr = res.gen
         if self.strategy == 'TAG':
             beta.bag = TagBag.collect(beta.expr)
 
-        # Создаем детей для beta из того, что попало в подстановку (v1 -> expr1, ...)
-        sorted_vnames = sorted(res.sub2.keys(), key=natural_key) # sub2 - подстановка для beta
-
+        sorted_vnames = sorted(res.sub2.keys(), key=natural_key)
         for v_name in sorted_vnames:
             val_expr = res.sub2[v_name]
             child = self._create_node(val_expr, var_types=beta.var_types.copy())
-
-            # Помечаем ребро как let-связывание
             let_info = Contraction(var_name=v_name, pattern=None, value=val_expr)
             beta.add_child(child, let_info)
             unprocessed.append(child)

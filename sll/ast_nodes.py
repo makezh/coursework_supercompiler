@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 # --- Выражения ---
@@ -75,19 +75,22 @@ class IntLit(Expr):
 @dataclass
 class Let(Expr):
     """
-    Let-выражение: связывает переменную с выражением в теле \n
-    var_name - имя переменной \n
-    val - выражение, которое связывается с переменной \n
-    body - тело, в котором переменная доступна
+    Let-выражение (множественные связывания):
+      let v1 = e1; v2 = e2; ... in body
+
+    bindings: список пар (имя_переменной, выражение)
+    body: выражение, в котором доступны связанные переменные
     """
-    var_name: str
-    val: Expr
-    body: Expr
+    bindings: List[Tuple[str, 'Expr']] = field(default_factory=list)
+    body: 'Expr' = None  # type: ignore
+
     lineno: int = field(default=0, compare=False, repr=False)
     tag: Optional[int] = field(default=None, compare=False, repr=False)
 
     def __str__(self):
-        return f"let {self.var_name} = {self.val} in {self.body}"
+        # Печать в стабильном виде, удобном для логов/graphviz
+        binds = "; ".join(f"{name} = {expr}" for name, expr in self.bindings)
+        return f"(let {binds} in {self.body})"
 # --- Конец Выражений ---
 
 

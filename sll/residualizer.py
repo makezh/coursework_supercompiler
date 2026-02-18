@@ -1,5 +1,5 @@
 from typing import List, Dict, Tuple
-from sll.ast_nodes import Program, Rule, Pattern, Expr, Var, Ctr, FCall, IntLit
+from sll.ast_nodes import Program, Rule, Pattern, Expr, Var, Ctr, FCall, IntLit, Let
 from sll.process_tree import Node
 from sll.matching import substitute, match, MatchSuccess
 
@@ -11,6 +11,8 @@ class Residualizer:
         self.node_to_sig: Dict[Node, Tuple[str, List[Var]]] = {}
         self.f_count = 0
         self.g_count = 0
+        self.k_count = 0
+        self.let_cache: Dict[str, str] = {}
 
     def _rewrite_expr(self, expr: Expr) -> Expr:
         match expr:
@@ -32,6 +34,30 @@ class Residualizer:
                         return self._call_registered(target, expr)
 
                 return FCall(expr.name, [self._rewrite_expr(a) for a in expr.args], lineno=expr.lineno, tag=expr.tag)
+
+            case Let(bindings, body):
+                # 1) сначала резидуализируем значения биндингов (важно: тут применятся folding→g...)
+                new_bindings = [(name, self._rewrite_expr(val)) for name, val in bindings]
+
+                # 2) резидуализируем body
+                new_body = self._rewrite_expr(body)
+
+                # 3) кэш, чтобы одинаковые let не плодили 100 функций
+                key = str(Let(new_bindings, new_body))
+                if key in self.let_cache:
+                    kname = self.let_cache[key]
+                else:
+                    self.k_count += 1
+                    kname = f"k{self.k_count}"
+                    self.let_cache[key] = kname
+
+                    # k(h1,h2,...) -> body
+                    params = [Var(name) for name, _ in new_bindings]
+                    self.rules.append(Rule(Pattern(kname, params), new_body))
+
+                # 4) let ... in ... заменяем на вызов k(e1,e2,...)
+                args = [val for _, val in new_bindings]
+                return FCall(kname, args, lineno=getattr(expr, "lineno", 0), tag=getattr(expr, "tag", None))
 
             case _:
                 return expr
@@ -159,13 +185,22 @@ class Residualizer:
     def _get_vars(self, expr: Expr) -> List[Var]:
         vars_list = []
         seen = set()
-        def visit(e):
+        def visit(e, bound: set):
             match e:
                 case Var(name):
+                    if name in bound:
+                        return
                     if name not in seen:
                         seen.add(name)
                         vars_list.append(e)
                 case Ctr(_, args) | FCall(_, args):
-                    for a in args: visit(a)
-        visit(expr)
+                    for a in args: visit(a, bound)
+                case Let(bindings, body):
+                    for _, val in bindings:
+                        visit(val, bound)
+                    new_bound = set(bound)
+                    for name, _ in bindings:
+                        new_bound.add(name)
+                    visit(body, new_bound)
+        visit(expr, set())
         return vars_list
