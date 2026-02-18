@@ -64,7 +64,7 @@ class Supercompiler:
                 return root
         return None
 
-    def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr]):
+    def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr], max_steps:int = 100):
         """Строит дерево процессов для заданного выражения.
         start_expr: Начальное выражение для суперкомпиляции.
         start_var_types: Типы переменных начального выражения.
@@ -77,7 +77,14 @@ class Supercompiler:
 
         # Очередь необработанных узлов
         unprocessed = [self.tree]
+        steps = 0
         while unprocessed:
+            steps += 1
+            if steps > max_steps:
+                print(f"[STOP] step limit reached: {max_steps}")
+                print(f"[STOP] queue size={len(unprocessed)}")
+                print(f"[STOP] next node would be: {unprocessed[0].expr}")
+                break
             beta = unprocessed.pop(0)
 
             # --- Шаг А: Свертка (Folding/Renaming) ---
@@ -149,36 +156,17 @@ class Supercompiler:
 
     def _find_embedding_ancestor(self, node: Node) -> Node | None:
         """Ищет предка, который гомеоморфно вложен в текущий узел."""
-        # Мы проверяем свисток только для Вызовов Функций (FCall).
         # Конструкторы (Ctr) безопасны, мы их просто декомпозируем.
         # Если этого не сделать, add(a,b) свистнет на S(add(..)), и мы не дойдем до свертки.
-        def same_head(a, b) -> bool:
-            # не свистим по переменным и числам
-            if isinstance(a, (Var, IntLit)) or isinstance(b, (Var, IntLit)):
-                return False
-
-            # FCall сравниваем только с FCall того же имени
-            if isinstance(a, FCall) and isinstance(b, FCall):
-                return a.name == b.name
-
-            # Ctr сравниваем только с Ctr того же конструктора (S с S, Cons с Cons, ...)
-            if isinstance(a, Ctr) and isinstance(b, Ctr):
-                return a.name == b.name
-
-            return False
-        # if not isinstance(node.expr, FCall):
-        #     return None
+        if isinstance(node.expr, Ctr):
+            return None
 
         for alpha in node.ancestors():
             if getattr(alpha.expr, "name", None) == "PROGRAM_FOREST":
                 continue
-
-            if not same_head(alpha.expr, node.expr):
-                continue
-
             # Сравниваем только FCall с FCall
-            # if not isinstance(alpha.expr, FCall):
-            #     continue
+            if not isinstance(alpha.expr, FCall):
+                continue
 
             is_dangerous = False
 
@@ -188,7 +176,7 @@ class Supercompiler:
 
             elif self.strategy == 'TAG':
                 # Сравниваем мешки
-                if alpha.bag and node.bag:
+                if isinstance(node.expr, FCall) and alpha.bag and node.bag:
                     if TagBag.is_dangerous(alpha.bag, node.bag):
                         is_dangerous = True
 
