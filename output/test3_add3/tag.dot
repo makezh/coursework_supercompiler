@@ -1,32 +1,24 @@
 digraph ProcessTree {
-  label="Expression: (add3 x y z)\nWhistle Strategy: TAG | Gen Type: TOP";
+  label="Expression: add3\nWhistle Strategy: TAG | Gen Type: TOP";
   labelloc="t";
   fontsize=20;
   fontname="Arial";
 
     node [fontname="Courier New"];
     edge [fontname="Courier New"];
-    n0 [label="(add3 x y z)", shape=box];
-    n0 -> n1 [label=""];
-    n1 [label="(add (add x y) z)", shape=box];
-    n1 -> n2 [label="x -> (Z )"];
-    n1 -> n3 [label="x -> (S v1)"];
-    n2 [label="(add (add [Z] y) z)", shape=box];
-    n2 -> n4 [label=""];
-    n3 [label="(add (add [S v1] y) z)", shape=box];
-    n3 -> n5 [label=""];
-    n4 [label="(add y z)", shape=box];
-    n4 -> n6 [label="y -> (Z )"];
-    n4 -> n7 [label="y -> (S v2)"];
-    n5 [label="(add [S (add v1 y)] z)", shape=box];
-    n5 -> n8 [label=""];
-    n6 [label="z", shape=box];
-    n7 [label="[S (add v2 z)]", shape=box];
-    n7 -> n9 [label=""];
-    n8 [label="[S (add (add v1 y) z)]", shape=box];
-    n8 -> n10 [label=""];
-    n9 [label="(add v2 z)", shape=box];
-    n9 -> n4 [style=dashed, color=red, label="Folding"];
-    n10 [label="(add (add v1 y) z)", shape=box];
-    n10 -> n1 [style=dashed, color=red, label="Folding"];
+    n0 [label="(add (add x1 x2) x3)", shape=box];
+    n0 -> n1 [label="x1 -> (Z )"];
+    n0 -> n2 [label="x1 -> (S v1)"];
+    n1 [label="(add x2 x3)", shape=box];
+    n1 -> n3 [label="x2 -> (Z )"];
+    n1 -> n4 [label="x2 -> (S v2)"];
+    n2 [label="[S (add (add v1 x2) x3)]", shape=box];
+    n2 -> n5 [label=""];
+    n3 [label="x3", shape=box];
+    n4 [label="[S (add v2 x3)]", shape=box];
+    n4 -> n6 [label=""];
+    n5 [label="(add (add v1 x2) x3)", shape=box];
+    n5 -> n0 [style=dashed, color=red, label="Folding"];
+    n6 [label="(add v2 x3)", shape=box];
+    n6 -> n1 [style=dashed, color=red, label="Folding"];
 }

@@ -85,6 +85,13 @@ class Residualizer:
         return Program(self.rules, [], [])
 
     def _find_functions(self, node: Node):
+        if isinstance(node.expr, FCall) and node.expr.name == "PROGRAM_FOREST":
+            # forest — это контейнер, функции не создаём
+            for ch in node.children:
+                self._find_functions(ch)
+                if ch.back_link:
+                    self._register_func(ch.back_link)
+            return
         must_be_function = False
         if node is self.root:
             must_be_function = True

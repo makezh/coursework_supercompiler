@@ -9,11 +9,7 @@ digraph ProcessTree {
     n0 [label="(addAcc x1 x2)", shape=box];
     n0 -> n1 [label="x1 -> (Z )"];
     n0 -> n2 [label="x1 -> (S v1)"];
-    n1 [label="(addAcc [Z] x2)", shape=box];
-    n1 -> n3 [label=""];
-    n2 [label="(addAcc [S v1] x2)", shape=box];
-    n2 -> n4 [label=""];
-    n3 [label="x2", shape=box];
-    n4 [label="(addAcc v1 [S x2])", shape=box];
-    n4 -> n0 [style=dashed, color=red, label="Folding"];
+    n1 [label="x2", shape=box];
+    n2 [label="(addAcc v1 [S x2])", shape=box];
+    n2 -> n0 [style=dashed, color=red, label="Folding"];
 }

@@ -13,6 +13,8 @@ class TagBag:
         Если у узла tag=None, он игнорируется (не вносит вклад в мешок).
         """
         bag = Counter()
+        if not isinstance(expr, Expr):
+            return bag
 
         # Добавляем тег только если он существует
         if expr.tag is not None:
@@ -24,8 +26,10 @@ class TagBag:
                 for arg in args:
                     bag.update(TagBag.collect(arg))
 
-            case Let(_, val, body):
-                bag.update(TagBag.collect(val))
+            case Let(bindings, body):
+                # bindings: список (name, expr)
+                for _, val_expr in bindings:
+                    bag.update(TagBag.collect(val_expr))
                 bag.update(TagBag.collect(body))
 
             case _:

@@ -212,15 +212,21 @@ class Supercompiler:
         # 1. Считаем MSG
         res = msg(alpha.expr, beta.expr)
 
-        # Если обобщенное выражение совпадает с предком (с точностью до имен),
-        # то нет смысла перестраивать дерево. Это просто цикл.
+        # если TOP не даёт прогресса, уходим в BOTTOM
+        if isinstance(res.gen, Var):
+            self._generalize_bottom(alpha, beta, unprocessed)
+            return
+
+        # если gen равен alpha по переименованию — folding
         if _is_renaming(alpha.expr, res.gen):
-            # C' === C1
-            # Превращаем это в свертку (Folding)
             beta.back_link = alpha
             return
 
         old_alpha_expr = alpha.expr
+        if any(_is_renaming(old_alpha_expr, v) for v in res.sub1.values()):
+            self._generalize_bottom(alpha, beta, unprocessed)
+            return
+
         alpha.gen_alpha = old_alpha_expr
         alpha.gen_beta = beta.expr
         alpha.gen_result = res.gen
@@ -250,16 +256,18 @@ class Supercompiler:
 
             alpha.add_child(child, let_info)
             unprocessed.append(child)
+        unprocessed.insert(0, alpha)
 
     def _generalize_bottom(self, alpha: Node, beta: Node, unprocessed: list):
         """
-        Обобщение снизу
-        если MSG(alpha, beta) вырождается в "дырку" Var(h),
-        то вместо этого строим let-узел по текущему beta-контексту:
-            beta := let h1=e1; h2=e2; ... in f(h1,h2,...)
+        Обобщение снизу.
+        Если MSG(alpha,beta) вырождается в дырку и beta = FCall(...),
+        строим Let по beta-контексту и возвращаем beta в очередь,
+        чтобы driver разложил Let на детей.
         """
         res = msg(alpha.expr, beta.expr)
 
+        # Книжный случай: разные головы -> MSG дырка -> делаем контекстный Let по beta
         if isinstance(res.gen, Var) and isinstance(beta.expr, FCall):
             f_name = beta.expr.name
             args = beta.expr.args
@@ -274,30 +282,30 @@ class Supercompiler:
             beta.gen_alpha = alpha.expr
             beta.gen_beta = beta.expr
             beta.gen_result = Let(bindings=bindings, body=FCall(f_name, hole_vars))
-            unprocessed.insert(0, beta)
 
             beta.expr = beta.gen_result
             if self.strategy == "TAG":
                 beta.bag = TagBag.collect(beta.expr)
+
+            unprocessed.insert(0, beta)
             return
 
-        # Обычный путь (когда MSG сохраняет структуру, не дырка)
-        old_beta_expr = beta.expr
+        # Обычный путь (MSG сохраняет структуру)
         beta.gen_alpha = alpha.expr
-        beta.gen_beta = old_beta_expr
+        beta.gen_beta = beta.expr
         beta.gen_result = res.gen
 
-        beta.expr = res.gen
-        if self.strategy == 'TAG':
+        bindings = []
+        for v_name in sorted(res.sub2.keys(), key=natural_key):
+            bindings.append((v_name, res.sub2[v_name]))
+
+        beta.expr = Let(bindings=bindings, body=res.gen)
+
+        if self.strategy == "TAG":
             beta.bag = TagBag.collect(beta.expr)
 
-        sorted_vnames = sorted(res.sub2.keys(), key=natural_key)
-        for v_name in sorted_vnames:
-            val_expr = res.sub2[v_name]
-            child = self._create_node(val_expr, var_types=beta.var_types.copy())
-            let_info = Contraction(var_name=v_name, pattern=None, value=val_expr)
-            beta.add_child(child, let_info)
-            unprocessed.append(child)
+        unprocessed.insert(0, beta)
+        return
 
     def run_hypercycle(self, start_expr, start_var_types):
         """

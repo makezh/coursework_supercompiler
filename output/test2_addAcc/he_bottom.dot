@@ -1,0 +1,25 @@
+digraph ProcessTree {
+  label="Expression: addAcc\nWhistle Strategy: HE | Gen Type: BOTTOM";
+  labelloc="t";
+  fontsize=20;
+  fontname="Arial";
+
+    node [fontname="Courier New"];
+    edge [fontname="Courier New"];
+    n0 [label="(PROGRAM_FOREST )", shape=box];
+    n0 -> n1 [label=""];
+    n1 [label="(addAcc x1 x2)", shape=box];
+    n1 -> n2 [label="x1 -> (Z )"];
+    n1 -> n3 [label="x1 -> (S v1)"];
+    n2 [label="x2", shape=box];
+    n3 [label="(let v1 = v1; v2 = [S x2] in (addAcc v1 v2))", shape=box, style="filled", fillcolor="lightyellow", color="orange", penwidth=2.0];
+    n3 -> n4 [label=""];
+    n3 -> n5 [label=""];
+    n3 -> n6 [label=""];
+    n4 [label="v1", shape=box];
+    n5 [label="[S x2]", shape=box];
+    n5 -> n7 [label=""];
+    n6 [label="(addAcc v1 v2)", shape=box];
+    n6 -> n1 [style=dashed, color=red, label="Folding"];
+    n7 [label="x2", shape=box];
+}
