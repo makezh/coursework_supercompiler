@@ -2,6 +2,7 @@ from typing import List, Dict, Tuple
 from sll.ast_nodes import Program, Rule, Pattern, Expr, Var, Ctr, FCall, IntLit, Let
 from sll.process_tree import Node
 from sll.matching import substitute, match, MatchSuccess
+from sll.supercompiler import _is_renaming
 
 
 class Residualizer:
@@ -74,13 +75,37 @@ class Residualizer:
         return FCall(func_name, args)
 
     def residualize(self) -> Program:
+        if isinstance(self.root.expr, FCall) and self.root.expr.name == "PROGRAM_FOREST":
+            roots = self.root.children
+            if not roots:
+                return Program([], [], [])
+
+            for r in roots:
+                self._find_functions(r)
+
+            for node in list(self.node_to_sig.keys()):
+                self._generate_definition(node)
+
+            start_root = roots[0]
+            if hasattr(self, "start_expr"):
+                for r in roots:
+                    if _is_renaming(r.expr, self.start_expr):
+                        start_root = r
+                        break
+
+            entry_name = "main"
+            start_sig_name, start_params = self.node_to_sig[start_root]
+            self.rules.insert(
+                0,
+                Rule(Pattern(entry_name, start_params),
+                     FCall(start_sig_name, list(start_params)))
+            )
+
+            return Program(self.rules, [], [])
+
+        # обычный режим
         self._find_functions(self.root)
-
-        # Сортировка для детерминизма (по id узла или порядку добавления)
-        nodes = list(self.node_to_sig.keys())
-        # Можно отсортировать по именам функций для красоты, но не обязательно
-
-        for node in nodes:
+        for node in list(self.node_to_sig.keys()):
             self._generate_definition(node)
         return Program(self.rules, [], [])
 

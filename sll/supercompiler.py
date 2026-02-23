@@ -309,43 +309,62 @@ class Supercompiler:
 
     def run_hypercycle(self, start_expr, start_var_types):
         """
-        Реализация Гиперцикла Абрамова.
-        Итеративно строит графы для всех базисных конфигураций.
+        Гиперцикл Абрамова:
+        строим деревья процессов для множества базисных конфигураций.
+        Ключевой момент: конфигурации идентифицируются по КАНОНИЧЕСКОМУ корню
+        (после нормализации/прогонки внутри build_tree).
         """
-        # Набор выражений, которые мы уже суперкомпилировали (базисные конфигурации)
-        processed_configs = {}
 
-        # Очередь на суперкомпиляцию. Первым идет стартовое выражение.
-        queue = [(start_expr, start_var_types)]
+        processed_configs: dict[str, Node] = {}
+
+        queue: list[tuple[Expr, dict]] = [(start_expr, start_var_types)]
+
+        start_canon: str | None = None
 
         while queue:
             current_expr, current_types = queue.pop(0)
-            expr_str = str(current_expr)
-            if expr_str in processed_configs:
-                continue
 
-            print(f"  Hypercycle: processing config {expr_str}")
-
-            # Строим дерево
+            # 1) Строим дерево для текущего выражения
             self.build_tree(current_expr, current_types)
 
-            # Сохраняем корень этого дерева
-            processed_configs[expr_str] = self.tree
+            # 2) Канонический ключ = фактический корень после прогонки/нормализации
+            canon = str(self.tree.expr)
 
-            # Ищем новые базисные конфигурации
-            new_bases = self._find_all_backlink_targets(self.tree)
-            for base_node in new_bases:
-                b_str = str(base_node.expr)
-                if b_str not in processed_configs:
+            # запоминаем канон старта (важно для add3!)
+            if start_canon is None and _is_renaming(self.tree.expr, start_expr):
+                start_canon = canon
+
+            # 3) Если уже обработано — ничего не делаем
+            if canon in processed_configs:
+                continue
+
+            print(f"  Hypercycle: processing config {canon}")
+            processed_configs[canon] = self.tree
+
+            # 4) Собираем базисные конфигурации (цели backlink'ов) и добавляем в очередь
+            for base_node in self._find_all_backlink_targets(self.tree):
+                b_canon = str(base_node.expr)
+                if b_canon not in processed_configs:
                     queue.append((base_node.expr, base_node.var_types))
 
+        # 5) Фиксируем лес
         self.hypercycle_roots = processed_configs
-        self.tree = processed_configs[str(start_expr)]
 
+        # 6) Выбираем стартовый корень корректно:
+        # если start_canon не нашёлся (редко), берём корень по канону после build_tree(start_expr)
+        if start_canon is None:
+            # пересоберём один раз, чтобы узнать канон старта
+            self.build_tree(start_expr, start_var_types)
+            start_canon = str(self.tree.expr)
+
+        self.tree = self.hypercycle_roots[start_canon]
+
+        # 7) Обрезаем ссылки на другие корни и собираем PROGRAM_FOREST
         self._prune_forest()
         forest_root = Node(FCall("PROGRAM_FOREST", []), {})
 
-        for expr_str, root_node in self.hypercycle_roots.items():
+        # (порядок можно сохранить как в processed_configs, но лучше стабилизировать)
+        for _, root_node in self.hypercycle_roots.items():
             forest_root.add_child(root_node)
 
         self.tree = forest_root
