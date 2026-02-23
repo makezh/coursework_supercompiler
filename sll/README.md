@@ -195,6 +195,61 @@ sll/
  └── type_checker.py
 ```
 
+# 💻 Пример программы
+
+```text
+<< Определение полиморфного списка >>
+type [List a] : Cons a [List a] | Nil.
+
+<< Определение типа Натуральных чисел >>
+type [Nat] : Z | S [Nat].
+
+<< Фиктивный тип для встроенных чисел >>
+type [Int] : .
+
+<< Функция склеивания списков (Полиморфная) >>
+fun (append [List a] [List a]) -> [List a] :
+    (append [Cons x xs] ys) -> [Cons x (append xs ys)] |
+    (append [Nil] ys) -> ys.
+
+<< Функция с числами >>
+fun (isZero [Int]) -> [Nat] :
+    (isZero 0) -> [S [Z]]  << 1 (True) >> |
+    (isZero x) -> [Z].     << 0 (False) >>
+```
+
+# 🔤 Грамматика (EBNF)
+```ebnf
+Module      ::= { TypeDecl | FunDecl }
+
+TypeDecl    ::= "type" TypeHead ":" AltList "."
+TypeHead    ::= "[" ConstrName { TypeVar } "]"                 // [List x], [Pair x y]
+AltList     ::= Alt { "|" Alt }
+Alt         ::= ConstrName { TypeField }                       // Cons x [List x] | Nil
+TypeField   ::= TypeVar | TypeAnnot
+
+FunDecl     ::= "fun" FunSig ":" ClauseList "."
+FunSig      ::= "(" FunName { TypeAnnot } ")" "->" TypeAnnot
+ClauseList  ::= Clause { "|" Clause }
+Clause      ::= "(" Pattern ")" "->" Expr
+
+Pattern     ::= FunName { PatAtom }                            // (append [Cons x xs] ys)
+PatAtom     ::= Var | "[" ConstrName { PatAtom } "]"           // чисел в паттернах нет
+
+Expr        ::= Var
+             | "(" FunName { Expr } ")"                        // вызов функции
+             | "[" ConstrName { Expr } "]"                     // значение-конструктор
+             | IntLit                                          // числовой литерал: 0, 1, 42
+
+TypeAnnot   ::= "[" TypeTerm "]"
+TypeTerm    ::= TypeVar | ConstrName { TypeAnnot }
+
+Var         ::= lcIdent
+FunName     ::= lcIdent
+ConstrName  ::= ucIdent
+TypeVar     ::= lcIdent
+```
+
 ---
 
 # 📘 Теоретическая база
