@@ -2,7 +2,6 @@ import argparse
 import sys
 import os
 
-# Добавляем путь к пакету sll
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from sll.parser import parse, Parser, tokenize
@@ -12,7 +11,6 @@ from sll.residualizer import Residualizer
 from sll.exporter import to_dot
 from sll.ast_nodes import TypeExpr, Var
 
-# Настройки папок
 SAMPLES_DIR = "samples"
 OUTPUT_DIR = "output"
 
@@ -64,10 +62,6 @@ def main():
 
     # --- 3. Парсинг выражения и Авто-определение сигнатуры ---
     start_var_types = {}
-
-    start_var_types = {}
-
-    # Если введено просто имя функции (без скобок) — строим канонический вызов
     if "(" not in args.expr and ")" not in args.expr:
         func_name = args.expr
 
@@ -76,13 +70,9 @@ def main():
             print(f"Error: Function '{func_name}' not found in signatures.")
             return
 
-        # Канонические имена аргументов: sc1, sc2, ...
         arg_names = [f"x{i+1}" for i in range(len(sig.arg_types))]
-
-        # Собираем строку стартового выражения, но не пытаемся “угадать” имена из правил
         start_expr_str = f"({func_name} {' '.join(arg_names)})"
 
-        # Заполняем типы из сигнатуры
         for i, t_expr in enumerate(sig.arg_types):
             start_var_types[arg_names[i]] = t_expr
 
@@ -96,14 +86,6 @@ def main():
             return
 
     else:
-        # Иначе парсим то, что ввёл пользователь
-        try:
-            start_expr = Parser(tokenize(args.expr)).parse_expr()
-        except Exception as e:
-            print(f"Expression Parse Error: {e}")
-            return
-
-        # Парсим уже готовое (или введенное вручную) выражение
         try:
             start_expr = Parser(tokenize(args.expr)).parse_expr()
         except Exception as e:
@@ -111,7 +93,6 @@ def main():
             return
 
     # --- 4. Разбор типов переменных (если переданы вручную через -t) ---
-    # Ручные типы имеют приоритет над автоматическими
     for t_str in args.types:
         if "=" not in t_str:
             print(f"Error: Invalid type format '{t_str}'. Use 'var=Type'")
@@ -137,7 +118,6 @@ def main():
     # Создаем папку output, если нет
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Формируем полный путь к выходному файлу (без расширения)
     out_path_base = os.path.join(OUTPUT_DIR, args.out)
 
     print(f"--- Exporting Graph to {OUTPUT_DIR}/ ---")
@@ -160,12 +140,10 @@ def main():
     with open(f"{out_path_base}.dot", 'w', encoding='utf-8') as f:
         f.write(dot_code)
 
-    # Рисуем картинку
+    # Рисуем граф
     if HAS_GRAPHVIZ:
         try:
-            # graphviz сам добавит расширение .png к filename
             s = graphviz.Source(dot_code)
-            # render(filename, directory, ...)
             output_file = s.render(filename=args.out, directory=OUTPUT_DIR, format="png", cleanup=True)
             print(f"✅ Graph saved: {output_file}")
         except Exception as e:
