@@ -104,6 +104,14 @@ class Supercompiler:
                 self._drive_node_with_step(beta, step, unprocessed)
                 step = self.driver.drive(beta.expr, beta.var_types)
                 print(f"[DRIVE*] at {beta.expr}  step={type(step).__name__}")
+                if self.strategy == "TAG":
+                    print(f"[BAG] expr={beta.expr} bag={beta.bag} heap={len(beta.heap)} stack={len(beta.stack)}")
+
+            ancestor = _find_renaming_ancestor(beta)
+            if ancestor:
+                beta.back_link = ancestor
+                print(f"[FOLD*] beta={beta.expr}  -> alpha={ancestor.expr}")
+                continue
 
             # --- Шаг В: Свисток (Whistle) ---
             # Здесь происходит выбор: HE или TAG
@@ -126,7 +134,7 @@ class Supercompiler:
         """Создает узел и сразу считает мешок тегов, если нужно."""
         node = Node(expr, var_types)
         if self.strategy == 'TAG':
-            node.bag = TagBag.collect(expr)
+            node.bag = TagBag.collect(node)
         return node
 
     def _drive_node_with_step(self, node: Node, step: DriveStep, unprocessed: list):
@@ -137,17 +145,11 @@ class Supercompiler:
                 return
 
             case LetStep(bindings, body):
-                # 1) bindings: let h = value
-                for v_name, val_expr in bindings:
-                    child = self._create_node(val_expr, var_types=node.var_types.copy())
-                    let_info = Contraction(var_name=v_name, pattern=None, value=val_expr)
-                    node.add_child(child, let_info)
-                    new_children.append(child)
-
-                # 2) body: обычный ребёнок (без подписи let)
-                body_child = self._create_node(body, var_types=node.var_types.copy())
-                node.add_child(body_child)
-                new_children.append(body_child)
+                node.extend_heap(bindings)
+                node.expr = body
+                if self.strategy == "TAG":
+                    node.bag = TagBag.collect(node)
+                return
 
             case TransientStep(next_expr, rule_pat):
                 node.driven_from = node.expr
@@ -155,14 +157,24 @@ class Supercompiler:
                 node.expr = next_expr
 
                 if self.strategy == "TAG":
-                    node.bag = TagBag.collect(node.expr)
+                    node.bag = TagBag.collect(node)
 
             case DecomposeStep(parts):
+                # NEW: контекст вырос у node
+                node.push_frame(getattr(node.expr, "tag", None), kind="DECOMP")
+                if self.strategy == "TAG":
+                    node.bag = TagBag.collect(node)
+
                 for part in parts:
                     child = self._create_node(part, var_types=node.var_types.copy())
                     node.add_child(child)
                     new_children.append(child)
+
             case VariantStep(branches):
+                node.push_frame(getattr(node.expr, "tag", None), kind="CASE")
+                if self.strategy == "TAG":
+                    node.bag = TagBag.collect(node)
+
                 for expr_branch, contraction, branch_types, applied_pat in branches:
                     child = self._create_node(expr_branch, var_types=branch_types)
                     child.driven_rule = applied_pat
@@ -172,33 +184,28 @@ class Supercompiler:
         unprocessed.extend(new_children)
 
     def _find_embedding_ancestor(self, node: Node) -> Node | None:
-        """Ищет предка, который гомеоморфно вложен в текущий узел."""
-        # Конструкторы (Ctr) безопасны, мы их просто декомпозируем.
-        # Если этого не сделать, add(a,b) свистнет на S(add(..)), и мы не дойдем до свертки.
+    # эвристика: не свистим на конструкторах (можно оставить)
         if isinstance(node.expr, Ctr):
             return None
 
         for alpha in node.ancestors():
             if getattr(alpha.expr, "name", None) == "PROGRAM_FOREST":
                 continue
-            # Сравниваем только FCall с FCall
-            if not isinstance(alpha.expr, FCall):
-                continue
 
-            is_dangerous = False
-
-            if self.strategy == 'HE':
+            if self.strategy == "HE":
+                if not isinstance(alpha.expr, FCall):
+                    continue
                 if he(alpha.expr, node.expr):
-                    is_dangerous = True
+                    return alpha
 
-            elif self.strategy == 'TAG':
-                # Сравниваем мешки
-                if isinstance(node.expr, FCall) and alpha.bag and node.bag:
+            elif self.strategy == "TAG":
+                # страховка: TAG не должен побеждать renaming
+                if _is_renaming(alpha.expr, node.expr):
+                    continue
+                if alpha.bag is not None and node.bag is not None:
                     if TagBag.is_dangerous(alpha.bag, node.bag):
-                        is_dangerous = True
+                        return alpha
 
-            if is_dangerous:
-                return alpha
         return None
 
     def _generalize(self, alpha: Node, beta: Node, unprocessed: list):
@@ -235,7 +242,7 @@ class Supercompiler:
         # print(f"GENERALIZATION: {alpha.expr} AND {beta.expr} -> {res.gen}")
         alpha.expr = res.gen
         if self.strategy == 'TAG':
-            alpha.bag = TagBag.collect(alpha.expr)
+            alpha.bag = TagBag.collect(alpha)
 
         _remove_children_from_unprocessed(alpha, unprocessed)
         alpha.children = []  # Очищаем историю (забываем путь, который привел к beta)
@@ -285,7 +292,7 @@ class Supercompiler:
 
             beta.expr = beta.gen_result
             if self.strategy == "TAG":
-                beta.bag = TagBag.collect(beta.expr)
+                beta.bag = TagBag.collect(beta)
 
             unprocessed.insert(0, beta)
             return
@@ -302,7 +309,7 @@ class Supercompiler:
         beta.expr = Let(bindings=bindings, body=res.gen)
 
         if self.strategy == "TAG":
-            beta.bag = TagBag.collect(beta.expr)
+            beta.bag = TagBag.collect(beta)
 
         unprocessed.insert(0, beta)
         return

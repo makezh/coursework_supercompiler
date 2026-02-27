@@ -15,6 +15,27 @@ class Contraction:
     pattern: Optional[Pattern]
     value: Optional[Expr] = None
 
+@dataclass
+class HeapBinding:
+    """
+    Binding в heap (как в ⟨H|e|K⟩).
+    Храним имя (для восстановления/читаемости) и rhs-выражение.
+    В tag-bag берётся ТОЛЬКО root-tag rhs.
+    """
+    name: str
+    expr: Expr
+
+
+@dataclass
+class StackFrame:
+    """
+    Frame в стеке K.
+    Для tag-bag нам нужен root-tag кадра.
+    В MVP будем хранить только tag (и опционально kind для отладки).
+    """
+    tag: Optional[int]
+    kind: str = "GEN"
+
 @dataclass(eq=False)
 class Node:
     """
@@ -24,6 +45,9 @@ class Node:
 
     # Словарь: имя переменной -> выражение типа
     var_types: Dict[str, TypeExpr]
+
+    heap: List[HeapBinding] = field(default_factory=list)
+    stack: List[StackFrame] = field(default_factory=list)
 
     bag: Optional[Counter] = None        # Мешок тегов (для свистка)
 
@@ -46,8 +70,25 @@ class Node:
     def add_child(self, node: 'Node', contraction: Optional[Contraction] = None):
         node.parent = self
         node.contraction = contraction
+
+        node.heap = list(self.heap)
+        node.stack = list(self.stack)
+
         self.children.append(node)
         return node
+
+    def clone_state_from(self, parent: 'Node'):
+        # shallow-copy списков достаточно: HeapBinding/StackFrame иммутабельны для MVP
+        self.heap = list(parent.heap)
+        self.stack = list(parent.stack)
+        return self
+
+    def push_frame(self, tag: Optional[int], kind: str = "GEN"):
+        self.stack.append(StackFrame(tag=tag, kind=kind))
+
+    def extend_heap(self, bindings: List[Tuple[str, Expr]]):
+        for name, e in bindings:
+            self.heap.append(HeapBinding(name=name, expr=e))
 
     def __str__(self):
         types_str = ", ".join(f"{k}:{v.name}" for k, v in self.var_types.items())

@@ -1,49 +1,44 @@
 from collections import Counter
-from sll.ast_nodes import Expr, Ctr, FCall, Let
+from typing import Optional
+
+from sll.process_tree import Node
+
 
 class TagBag:
-    """
-    Логика работы с мешками тегов.
-    """
+    W_HEAP = 2
+    W_FOCUS = 3
+    W_STACK = 5
 
     @staticmethod
-    def collect(expr: Expr) -> Counter:
+    def _add_tag(bag: Counter, tag: Optional[int], weight: int):
+        if tag is None:
+            return
+        bag[tag] += weight
+
+    @staticmethod
+    def collect(node: Node) -> Counter:
         """
-        Рекурсивно собирает теги, пришедшие из исходной программы.
-        Если у узла tag=None, он игнорируется (не вносит вклад в мешок).
+        Возвращает tag-bag для конфигурации узла (heap/focus/stack).
         """
         bag = Counter()
-        if not isinstance(expr, Expr):
-            return bag
 
-        # Добавляем тег только если он существует
-        if expr.tag is not None:
-            bag[expr.tag] += 1
+        # focus root tag: 3 * tag(focus)
+        TagBag._add_tag(bag, getattr(node.expr, "tag", None), TagBag.W_FOCUS)
 
-        # Рекурсивный спуск по всем видам узлов
-        match expr:
-            case Ctr(_, args) | FCall(_, args):
-                for arg in args:
-                    bag.update(TagBag.collect(arg))
+        # heap root tags: 2 * tag(rhs)
+        for hb in getattr(node, "heap", []):
+            TagBag._add_tag(bag, getattr(hb.expr, "tag", None), TagBag.W_HEAP)
 
-            case Let(bindings, body):
-                # bindings: список (name, expr)
-                for _, val_expr in bindings:
-                    bag.update(TagBag.collect(val_expr))
-                bag.update(TagBag.collect(body))
-
-            case _:
-                pass
+        # stack root tags: 5 * tag(frame)
+        for fr in getattr(node, "stack", []):
+            TagBag._add_tag(bag, getattr(fr, "tag", None), TagBag.W_STACK)
 
         return bag
 
     @staticmethod
-    def is_dangerous(bag_old: Counter, bag_new: Counter) -> bool:
-        """
-        Проверяет условие свистка.
-        """
-        # Если мешок пуст, сравнивать нечего
-        if not bag_old:
+    def is_dangerous(old, new):
+        if not old:
             return False
-
-        return bag_new >= bag_old
+        if not set(old.keys()).issubset(set(new.keys())):
+            return False
+        return sum(new.values()) >= sum(old.values())
