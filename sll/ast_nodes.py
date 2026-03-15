@@ -146,6 +146,9 @@ class Pattern:
 
     def __str__(self):
         params_str = " ".join(str(p) for p in self.params)
+        # Конструктор в паттерне (имя с заглавной буквы) — квадратные скобки
+        if self.name and self.name[0].isupper():
+            return f"[{self.name} {params_str}]" if params_str else f"[{self.name}]"
         return f"({self.name} {params_str})"
 
 
