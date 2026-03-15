@@ -95,10 +95,21 @@ def main():
     # --- 4. Разбор типов переменных (если переданы вручную через -t) ---
     for t_str in args.types:
         if "=" not in t_str:
-            print(f"Error: Invalid type format '{t_str}'. Use 'var=Type'")
+            print(f"Error: Invalid type format '{t_str}'. Use 'var=[Type]' or 'var=Type'")
             return
-        vname, tname = t_str.split("=")
-        start_var_types[vname] = TypeExpr(tname, [])
+        vname, tname = t_str.split("=", 1)
+        tname = tname.strip()
+        if tname.startswith('['):
+            try:
+                type_tokens = list(tokenize(tname))
+                p = Parser(type_tokens)
+                parsed_type = p.parse_type_expr()
+                start_var_types[vname] = parsed_type
+            except Exception as e:
+                print(f"Error parsing type '{tname}': {e}")
+                return
+        else:
+            start_var_types[vname] = TypeExpr(tname, [])
 
     # --- 5. Запуск Суперкомпилятора ---
     print(f"--- Supercompiling: {start_expr} ---")

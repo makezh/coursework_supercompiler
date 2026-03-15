@@ -7,6 +7,16 @@ from sll.matching import match as match_term, substitute, \
 from sll.process_tree import Contraction
 
 
+def _instantiate_type(type_expr: TypeExpr, subst: dict) -> TypeExpr:
+    """Подставляет конкретные типы вместо типовых параметров.
+    Например, TypeExpr("x",[]) при subst={"x": TypeExpr("Letter",[])} → TypeExpr("Letter",[])
+    """
+    if not type_expr.params:
+        return subst.get(type_expr.name, type_expr)
+    new_params = [_instantiate_type(p, subst) for p in type_expr.params]
+    return TypeExpr(type_expr.name, new_params, lineno=type_expr.lineno)
+
+
 # --- Генератор имен ---
 class NameGen:
     def __init__(self):
@@ -124,11 +134,22 @@ class Driver:
 
             match res:
                 case MatchSuccess(bindings):
-                    # Почему поменял:
-                    # Если до этого мы уже нашли правила, требующие сужения (branches не пуст),
-                    # то мы НЕ МОЖЕМ применять это правило, так как более приоритетные
-                    # правила "застряли" на переменной. Мы обязаны делать ветвление.
                     if branches:
+                        # Catch-all правило после специфических: нужно добавить ветки
+                        # для ВСЕХ конструкторов типа, не покрытых предыдущими MatchNarrowing.
+                        # Иначе теряем случаи B, C, D когда покрыт только A.
+                        narrowed_var = branches[0][1].var_name
+                        covered = {b[1].pattern.name for b in branches
+                                   if b[1] and b[1].pattern}
+                        if narrowed_var in var_types:
+                            type_name = var_types[narrowed_var].name
+                            if type_name in self.type_map:
+                                for constr_def in self.type_map[type_name].constructors:
+                                    if constr_def.name not in covered:
+                                        branch = self._create_branch(
+                                            expr, narrowed_var, constr_def.name, var_types)
+                                        if branch:
+                                            branches.append(branch)
                         return VariantStep(branches=branches)
 
                     # Если препятствий не было — редуцируем
@@ -136,12 +157,15 @@ class Driver:
                     return TransientStep(next_expr=new_expr, rule_pat=rule.pattern)
 
                 case MatchNarrowing(var_name, constr_name, _):
-                    # Нашли переменную для сужения
-                    branch = self._create_branch(expr, var_name, constr_name, var_types)
-                    if branch:
-                        branches.append(branch)
-                    # Мы продолжаем цикл, чтобы собрать ветки для других конструкторов
-                    # (например, Rule 1 требует Z, Rule 2 требует S)
+                    # Добавляем ветку только если этот конструктор ещё не покрыт.
+                    # Два правила с одним верхним конструктором (fab [Cons [A] xs]
+                    # и fab [Cons x xs]) не должны порождать дублирующие Cons-ветки.
+                    covered_now = {b[1].pattern.name for b in branches
+                                   if b[1] and b[1].pattern}
+                    if constr_name not in covered_now:
+                        branch = self._create_branch(expr, var_name, constr_name, var_types)
+                        if branch:
+                            branches.append(branch)
 
                 case MatchFail():
                     continue
@@ -175,6 +199,13 @@ class Driver:
         if not constr_def:
             return None  # Неизвестный конструктор
 
+        # Строим подстановку типовых параметров, например {"x": TypeExpr("Letter",[])}
+        var_type_expr = var_types[var_name]
+        type_param_subst = {
+            param: arg
+            for param, arg in zip(type_def.params, var_type_expr.params)
+        }
+
         # Создаем новые переменные для аргументов конструктора
         fresh_vars = []
         new_branch_types = var_types.copy()
@@ -182,7 +213,7 @@ class Driver:
         for arg_type in constr_def.arg_types:
             v = Var(self.name_gen.fresh_var())
             fresh_vars.append(v)
-            new_branch_types[v.name] = arg_type
+            new_branch_types[v.name] = _instantiate_type(arg_type, type_param_subst)
 
         # Создаем новый конструктор с этими переменными
         fresh_ctr = Ctr(constr_name, fresh_vars)

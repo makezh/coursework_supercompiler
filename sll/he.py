@@ -1,4 +1,4 @@
-from sll.ast_nodes import Expr, Var, Ctr, FCall, IntLit
+from sll.ast_nodes import Expr, Var, Ctr, FCall, IntLit, Let
 
 
 def he(t1: Expr, t2: Expr) -> bool:
@@ -42,6 +42,11 @@ def he(t1: Expr, t2: Expr) -> bool:
         case Ctr(_, args) | FCall(_, args):
             # t1 <| f(b1...bn), если t1 <| b1 ИЛИ t1 <| b2 ...
             return any(he(t1, arg) for arg in args)
+
+        case Let(bindings, body):
+            # t1 <| let ... in body, если t1 вкладывается в одно из значений или тело
+            vals = [val for _, val in bindings]
+            return any(he(t1, e) for e in vals + [body])
 
         case _:
             return False

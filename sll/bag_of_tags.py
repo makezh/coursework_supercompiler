@@ -39,6 +39,6 @@ class TagBag:
     def is_dangerous(old, new):
         if not old:
             return False
-        if not set(old.keys()).issubset(set(new.keys())):
+        if set(old.keys()) != set(new.keys()):
             return False
         return sum(new.values()) >= sum(old.values())

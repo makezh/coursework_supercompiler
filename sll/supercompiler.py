@@ -64,7 +64,7 @@ class Supercompiler:
                 return root
         return None
 
-    def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr], max_steps:int = 10):
+    def build_tree(self, start_expr: Expr, start_var_types: Dict[str, TypeExpr], max_steps:int = 100):
         """Строит дерево процессов для заданного выражения.
         start_expr: Начальное выражение для суперкомпиляции.
         start_var_types: Типы переменных начального выражения.
@@ -119,14 +119,15 @@ class Supercompiler:
             if dangerous_alpha:
                 print(f"[WHISTLE] alpha={dangerous_alpha.expr}  beta={beta.expr}  strategy={self.strategy}")
                 if self.gen_type == 'TOP':
-                    # Классика: рубим дерево сверху
                     print(f"[GEN] alpha={dangerous_alpha.expr}  beta={beta.expr} gen_type={self.gen_type}")
-                    self._generalize(dangerous_alpha, beta, unprocessed)
+                    did_gen = self._generalize(dangerous_alpha, beta, unprocessed)
                 else:
-                    # Абрамов: перестраиваем текущий узел снизу
                     print(f"[GEN] alpha={dangerous_alpha.expr}  beta={beta.expr} gen_type={self.gen_type}")
                     self._generalize_bottom(dangerous_alpha, beta, unprocessed)
-                continue
+                    did_gen = True
+                if did_gen:
+                    continue
+                # did_gen=False: обобщение отложено, прогоняем beta нормально
 
             self._drive_node_with_step(beta, step, unprocessed)
 
@@ -168,6 +169,8 @@ class Supercompiler:
                 for part in parts:
                     child = self._create_node(part, var_types=node.var_types.copy())
                     node.add_child(child)
+                    if self.strategy == "TAG":
+                        child.bag = TagBag.collect(child)
                     new_children.append(child)
 
             case VariantStep(branches):
@@ -179,6 +182,8 @@ class Supercompiler:
                     child = self._create_node(expr_branch, var_types=branch_types)
                     child.driven_rule = applied_pat
                     node.add_child(child, contraction)
+                    if self.strategy == "TAG":
+                        child.bag = TagBag.collect(child)
                     new_children.append(child)
 
         unprocessed.extend(new_children)
@@ -224,15 +229,21 @@ class Supercompiler:
             self._generalize_bottom(alpha, beta, unprocessed)
             return
 
-        # если gen равен alpha по переименованию — folding
+        # если gen равен alpha по переименованию:
+        # - если beta тоже переименование alpha → fold (стандартная свёртка)
+        # - если beta имеет БОЛЬШЕ структуры (напр. Cons вместо переменной) →
+        #   НЕ сворачиваем сейчас: beta нужно прогнать дальше, fold наступит
+        #   в рекурсивном подвызове (например, fbc(fab(v2)) вместо fbc(fab(Cons v1 v2)))
         if _is_renaming(alpha.expr, res.gen):
-            beta.back_link = alpha
-            return
+            if _is_renaming(beta.expr, alpha.expr):
+                beta.back_link = alpha
+                return True
+            return False  # сигнал: обобщение не выполнено, прогнать beta нормально
 
         old_alpha_expr = alpha.expr
         if any(_is_renaming(old_alpha_expr, v) for v in res.sub1.values()):
             self._generalize_bottom(alpha, beta, unprocessed)
-            return
+            return True
 
         alpha.gen_alpha = old_alpha_expr
         alpha.gen_beta = beta.expr
@@ -243,6 +254,13 @@ class Supercompiler:
         alpha.expr = res.gen
         if self.strategy == 'TAG':
             alpha.bag = TagBag.collect(alpha)
+
+        # Пробрасываем типы для свежих переменных MSG в var_types alpha.
+        # Тип v_i = тип выражения sub1[v_i] в контексте alpha.
+        # Если sub1[v_i] — переменная, берём её тип напрямую.
+        for v_name, val_expr in res.sub1.items():
+            if isinstance(val_expr, Var) and val_expr.name in alpha.var_types:
+                alpha.var_types[v_name] = alpha.var_types[val_expr.name]
 
         _remove_children_from_unprocessed(alpha, unprocessed)
         alpha.children = []  # Очищаем историю (забываем путь, который привел к beta)
@@ -264,6 +282,7 @@ class Supercompiler:
             alpha.add_child(child, let_info)
             unprocessed.append(child)
         unprocessed.insert(0, alpha)
+        return True
 
     def _generalize_bottom(self, alpha: Node, beta: Node, unprocessed: list):
         """
@@ -391,7 +410,7 @@ class Supercompiler:
         global_root = self._find_global_root(node)
 
         if global_root:
-            node.is_basis_ref = True
+            node.is_basis_ref = True  # объявлено в Node
             node.children = []
             return
 

@@ -67,6 +67,8 @@ class Node:
     gen_beta: Optional[Expr] = None    # на чем свистнули
     gen_result: Optional[Expr] = None  # во что обобщили
 
+    is_basis_ref: bool = False         # узел является ссылкой на корень другого дерева в лесу
+
     def add_child(self, node: 'Node', contraction: Optional[Contraction] = None):
         node.parent = self
         node.contraction = contraction

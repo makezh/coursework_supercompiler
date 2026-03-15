@@ -39,8 +39,9 @@ class TagAllocator:
                 for arg in args:
                     self._process_expr(arg)
 
-            case Let(_, val, body):
-                self._process_expr(val)
+            case Let(bindings, body):
+                for _, val in bindings:
+                    self._process_expr(val)
                 self._process_expr(body)
 
             case Var(_) | IntLit(_):

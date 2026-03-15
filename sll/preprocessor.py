@@ -31,8 +31,9 @@ class Tagger:
                 for arg in args:
                     self._tag_expr(arg)
 
-            case Let(_, val, body):
-                self._tag_expr(val)
+            case Let(bindings, body):
+                for _, val in bindings:
+                    self._tag_expr(val)
                 self._tag_expr(body)
 
             # Var и IntLit — листья, они получили тег в шаге 1, детей нет
