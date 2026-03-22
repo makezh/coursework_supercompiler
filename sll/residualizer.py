@@ -6,8 +6,9 @@ from sll.supercompiler import _is_renaming
 
 
 class Residualizer:
-    def __init__(self, tree_root: Node):
+    def __init__(self, tree_root: Node, original_program=None):
         self.root = tree_root
+        self.original_program = original_program
         self.rules: List[Rule] = []
         self.node_to_sig: Dict[Node, Tuple[str, List[Var]]] = {}
         self.f_count = 0
@@ -78,7 +79,7 @@ class Residualizer:
         if isinstance(self.root.expr, FCall) and self.root.expr.name == "PROGRAM_FOREST":
             roots = self.root.children
             if not roots:
-                return Program([], [], [])
+                return Program([], self._original_types(), [])
 
             for r in roots:
                 self._find_functions(r)
@@ -101,13 +102,13 @@ class Residualizer:
                      FCall(start_sig_name, list(start_params)))
             )
 
-            return Program(self.rules, [], [])
+            return Program(self.rules, self._original_types(), [])
 
         # обычный режим
         self._find_functions(self.root)
         for node in list(self.node_to_sig.keys()):
             self._generate_definition(node)
-        return Program(self.rules, [], [])
+        return Program(self.rules, self._original_types(), [])
 
     def _find_functions(self, node: Node):
         if isinstance(node.expr, FCall) and node.expr.name == "PROGRAM_FOREST":
@@ -213,6 +214,11 @@ class Residualizer:
              return self._transform(node.children[0])
 
         return self._rewrite_expr(node.expr)
+
+    def _original_types(self):
+        if self.original_program is not None:
+            return self.original_program.types
+        return []
 
     def _get_vars(self, expr: Expr) -> List[Var]:
         vars_list = []

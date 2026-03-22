@@ -164,7 +164,7 @@ def main():
 
     # --- 7. Резидуализация ---
     print("\n=== RESIDUAL PROGRAM ===")
-    res = Residualizer(sc.tree)
+    res = Residualizer(sc.tree, prog)
     new_prog = res.residualize()
     print(new_prog)
     print("========================")
