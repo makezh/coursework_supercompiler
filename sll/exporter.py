@@ -62,8 +62,7 @@ def to_dot(root: Node, dev_mode=False, start_expr=None) -> str:
     node_ids[id(root)] = f"n{counter}"
     counter += 1
 
-    # --- Стартовый узел и GEN-ромб корня ---
-    # Оба рендерятся здесь, чтобы выстроить цепочку: start → GEN → root
+    # --- Стартовый узел ---
     has_start = start_expr is not None
     has_root_gen = getattr(root, "gen_result", None) is not None and root.parent is None
     root_gen_rendered = has_root_gen  # пометим, чтобы не рисовать повторно в BFS
@@ -75,29 +74,15 @@ def to_dot(root: Node, dev_mode=False, start_expr=None) -> str:
             f'fillcolor="lightgreen", color="darkgreen", penwidth=2.0];'
         )
 
-    if has_root_gen:
-        aux_counter += 1
-        _root_gen_id = f"gen{aux_counter}"
-        a = to_tagged_str(root.gen_alpha) if root.gen_alpha else "?"
-        g = to_tagged_str(root.gen_result)
-        gen_label = (
-            "GEN\\n"
-            f"α: {a}\\n"
-            f"gen: {g}"
-        ).replace('"', '\\"')
-        lines.append(
-            f'    {_root_gen_id} [label="{gen_label}", shape=diamond, style="filled", '
-            f'fillcolor="lightyellow", color="orange"];'
-        )
-
     root_uid = node_ids[id(root)]
     if has_start and has_root_gen:
-        lines.append(f'    start -> {_root_gen_id} [];')
-        lines.append(f'    {_root_gen_id} -> {root_uid} [];')
+        # Информация об обобщении — подпись на стрелке, без отдельного ромба
+        a = to_tagged_str(root.gen_alpha) if root.gen_alpha else "?"
+        g = to_tagged_str(root.gen_result)
+        edge_label = f"MSG\\nα: {a}\\n→ {g}".replace('"', '\\"')
+        lines.append(f'    start -> {root_uid} [label="{edge_label}", color="darkorange", fontcolor="black", fontsize=10];')
     elif has_start:
         lines.append(f'    start -> {root_uid} [];')
-    elif has_root_gen:
-        lines.append(f'    {_root_gen_id} -> {root_uid} [];')
 
     while queue:
         node = queue.pop(0)
@@ -125,23 +110,7 @@ def to_dot(root: Node, dev_mode=False, start_expr=None) -> str:
 
         lines.append(f'    {uid} [label="{label}", shape=box{style_attr}];')
 
-        # 1b. GEN-ромб для самого узла (если он был обобщён in-place, как корень при TOP)
-        # Корень пропускаем — он уже отрендерен в блоке выше
-        if getattr(node, "gen_result", None) is not None and node.parent is None and not root_gen_rendered:
-            aux_counter += 1
-            gen_id = f"gen{aux_counter}"
-            a = to_tagged_str(node.gen_alpha) if node.gen_alpha else "?"
-            g = to_tagged_str(node.gen_result)
-            gen_label = (
-                "GEN\\n"
-                f"α: {a}\\n"
-                f"gen: {g}"
-            ).replace('"', '\\"')
-            lines.append(
-                f'    {gen_id} [label="{gen_label}", shape=diamond, style="filled", '
-                f'fillcolor="lightyellow", color="orange"];'
-            )
-            lines.append(f'    {gen_id} -> {uid} [];')
+        # GEN-ромб корня рендерится в блоке до BFS (как подпись на стрелке start→root)
 
         # 2. Ссылка назад (Folding)
         if node.back_link:
@@ -204,35 +173,21 @@ def to_dot(root: Node, dev_mode=False, start_expr=None) -> str:
                 from_id = drive_id
 
             if getattr(child, "gen_result", None) is not None:
-                aux_counter += 1
-                gen_id = f"gen{aux_counter}"
-
-                # Короткие строки (без тегов или с тегами — как тебе удобнее)
                 if dev_mode:
                     a = to_tagged_str(child.gen_alpha) if child.gen_alpha else "?"
                     g = to_tagged_str(child.gen_result)
                 else:
                     a = str(child.gen_alpha) if child.gen_alpha else "?"
                     g = str(child.gen_result)
-
-                gen_label = (
-                    "GEN\\n"
-                    f"α: {a}\\n"
-                    f"gen: {g}"
-                ).replace('"', '\\"')
-
-                # Ромбик Обобщения
+                gen_part = f"MSG\\nα: {a}\\n→ {g}".replace('"', '\\"')
+                combined = f"{edge_label}\\n{gen_part}" if edge_label else gen_part
                 lines.append(
-                    f'    {gen_id} [label="{gen_label}", shape=diamond, style="filled", '
-                    f'fillcolor="lightyellow", color="orange"];'
+                    f'    {from_id} -> {child_id} [label="{combined}", '
+                    f'color="darkorange", fontcolor="black", fontsize=10];'
                 )
-
-                branch_label = edge_label if is_branch_edge else ""
-                lines.append(f'    {from_id} -> {gen_id} [label="{branch_label}"];')
-                from_id = gen_id
-
-            dup_label = edge_label if is_branch_edge else edge_label
-            lines.append(f'    {from_id} -> {child_id} [label="{dup_label}"];')
+            else:
+                dup_label = edge_label if is_branch_edge else edge_label
+                lines.append(f'    {from_id} -> {child_id} [label="{dup_label}"];')
 
 
     lines.append("}")

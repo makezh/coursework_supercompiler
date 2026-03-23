@@ -9,9 +9,7 @@ digraph ProcessTree {
     start [label="(main x1)", shape=box, style="filled", fillcolor="lightgreen", color="darkgreen", penwidth=2.0];
     start -> n0 [];
     n0 [label="(eq (add x1 [S [Z]]) (add [S [Z]] x1))", shape=box];
-    gen1 [label="GEN\nα: (eq (add v1 [S [Z]]) v2)\ngen: (eq v1 v2)", shape=diamond, style="filled", fillcolor="lightyellow", color="orange"];
-    n0 -> gen1 [label="x1 -> [S v1]"];
-    gen1 -> n1 [label="x1 -> [S v1]"];
+    n0 -> n1 [label="x1 -> [S v1]\nMSG\nα: (eq (add v1 [S [Z]]) v2)\n→ (eq v1 v2)", color="darkorange", fontcolor="black", fontsize=10];
     n0 -> n2 [label="x1 -> [Z]"];
     n1 [label="(eq v1 v2)", shape=box];
     n1 -> n3 [label="let v1 = (add v1 [S [Z]])"];

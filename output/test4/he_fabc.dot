@@ -7,9 +7,7 @@ digraph ProcessTree {
     node [fontname="Courier New"];
     edge [fontname="Courier New"];
     start [label="(fabc x1)", shape=box, style="filled", fillcolor="lightgreen", color="darkgreen", penwidth=2.0];
-    gen1 [label="GEN\nα: (fbc (fab x1))\ngen: (fbc v1)", shape=diamond, style="filled", fillcolor="lightyellow", color="orange"];
-    start -> gen1 [];
-    gen1 -> n0 [];
+    start -> n0 [label="MSG\nα: (fbc (fab x1))\n→ (fbc v1)", color="darkorange", fontcolor="black", fontsize=10];
     n0 [label="(fbc v1)", shape=box];
     n0 -> n1 [label="let v1 = (fab x1)"];
     n0 -> n2 [label="v1 -> [Cons [B] v6]"];
