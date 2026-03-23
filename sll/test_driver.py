@@ -62,8 +62,10 @@ class TestRuleBasedDriver(unittest.TestCase):
         # Ожидаем 1 ветку (для Z), так как правило для S отсутствует
         self.assertEqual(len(step.branches), 1)
 
-        br_expr, contr, _ = step.branches[0]
-        self.assertEqual(contr.pattern.name, "Z")
+        br_expr, contr, *_ = step.branches[0]
+        # С полным сужением contraction.narrowings содержит подстановку
+        narrowed_ctr = list(contr.narrowings.values())[0]
+        self.assertEqual(narrowed_ctr.name, "Z")
         self.assertEqual(str(br_expr), "[Z]")
 
     def test_add_variants(self):
@@ -77,16 +79,21 @@ class TestRuleBasedDriver(unittest.TestCase):
         self.assertEqual(len(step.branches), 2)
 
         # Ветка 1: x=Z (из первого правила)
-        self.assertEqual(step.branches[0][1].pattern.name, "Z")
+        narrowing0 = {k: v for k, v in step.branches[0][1].narrowings.items()
+                      if not (hasattr(v, 'name') and v.name == k)}
+        self.assertEqual(list(narrowing0.values())[0].name, "Z")
+
         # Ветка 2: x=S (из второго правила)
-        self.assertEqual(step.branches[1][1].pattern.name, "S")
+        narrowing1 = {k: v for k, v in step.branches[1][1].narrowings.items()
+                      if not (hasattr(v, 'name') and v.name == k)}
+        self.assertEqual(list(narrowing1.values())[0].name, "S")
 
     def test_nested_call(self):
         """
         Вложенный вызов: add(onlyZero(x), y).
         onlyZero(x) требует разгонки x.
         add не может сработать, т.к. аргумент - вызов.
-        Драйвер должен 'нырнуть' в onlyZero и вернуть ветвление оттуда.
+        Драйвер должен 'нырнуть' в onlyZero и применить сужение x->Z к outer.
         """
         expr = self._expr("(add (onlyZero x) y)")
         var_types = {"x": TypeExpr("Nat", []), "y": TypeExpr("Nat", [])}
@@ -97,10 +104,10 @@ class TestRuleBasedDriver(unittest.TestCase):
         # Ветвление идет из onlyZero, там 1 правило -> 1 ветка
         self.assertEqual(len(step.branches), 1)
 
-        # Проверяем, что ветка обернута обратно в add
-        br_expr, _, _ = step.branches[0]
-        # Результат onlyZero([Z]) -> [Z]. Итоговое: (add [Z] y)
-        self.assertEqual(str(br_expr), "(add [Z] y)")
+        # Проверяем, что ветка содержит outer выражение с x=Z подставленным
+        br_expr, *_ = step.branches[0]
+        # x подставляется в onlyZero([Z]) внутри add
+        self.assertEqual(str(br_expr), "(add (onlyZero [Z]) y)")
 
     def test_catch_all_order(self):
         """

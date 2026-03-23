@@ -108,7 +108,22 @@ class Residualizer:
         self._find_functions(self.root)
         for node in list(self.node_to_sig.keys()):
             self._generate_definition(node)
+        self._generate_root_entry()
         return Program(self.rules, self._original_types(), [])
+
+    @staticmethod
+    def _is_pattern_contraction(c) -> bool:
+        """True если контракция представляет ветвление по паттерну (g-функция)."""
+        return (c.pattern is not None or
+                c.narrowings is not None or
+                c.is_default)
+
+    @staticmethod
+    def _expr_to_pattern(expr):
+        """Рекурсивно преобразует Ctr-выражение в Pattern для LHS правила."""
+        if isinstance(expr, Ctr):
+            return Pattern(expr.name, [Residualizer._expr_to_pattern(a) for a in expr.args])
+        return expr  # Var остаётся Var
 
     def _find_functions(self, node: Node):
         if isinstance(node.expr, FCall) and node.expr.name == "PROGRAM_FOREST":
@@ -124,8 +139,9 @@ class Residualizer:
 
         # G-функция (Ветвление)
         if len(node.children) > 1:
-            # Проверяем, что это не MSG (где pattern is None)
-            if any(c.contraction and c.contraction.pattern is not None for c in node.children):
+            # Проверяем, что это не MSG (где pattern is None, narrowings is None, not is_default)
+            if any(c.contraction and self._is_pattern_contraction(c.contraction)
+                   for c in node.children):
                 must_be_function = True
 
         if must_be_function and node not in self.node_to_sig:
@@ -140,10 +156,10 @@ class Residualizer:
         if node in self.node_to_sig: return
         vars_in_expr = self._get_vars(node.expr)
 
-        is_g = False
-        if node.children:
-            if node.children[0].contraction and node.children[0].contraction.pattern is not None:
-                is_g = True
+        is_g = any(
+            c.contraction and self._is_pattern_contraction(c.contraction)
+            for c in node.children
+        )
 
         if is_g:
             self.g_count += 1
@@ -156,20 +172,32 @@ class Residualizer:
     def _generate_definition(self, node: Node):
         name, params = self.node_to_sig[node]
 
-        is_g = False
-        if node.children:
-             if node.children[0].contraction and node.children[0].contraction.pattern is not None:
-                 is_g = True
+        is_g = any(
+            c.contraction and self._is_pattern_contraction(c.contraction)
+            for c in node.children
+        )
 
         if is_g:
             for child in node.children:
                 if not child.contraction: continue
+                if not self._is_pattern_contraction(child.contraction): continue
                 lhs_params = []
-                for var in params:
-                    if var.name == child.contraction.var_name:
-                        lhs_params.append(child.contraction.pattern)
-                    else:
-                        lhs_params.append(var)
+
+                if child.contraction.narrowings is not None or child.contraction.is_default:
+                    # Multi-narrowing или default branch
+                    narrowings = child.contraction.narrowings or {}
+                    for var in params:
+                        if var.name in narrowings:
+                            lhs_params.append(self._expr_to_pattern(narrowings[var.name]))
+                        else:
+                            lhs_params.append(var)
+                else:
+                    # Одиночное сужение (обратная совместимость)
+                    for var in params:
+                        if var.name == child.contraction.var_name:
+                            lhs_params.append(child.contraction.pattern)
+                        else:
+                            lhs_params.append(var)
 
                 pat = Pattern(name, lhs_params)
                 body = self._rewrite_expr(self._transform(child))
@@ -178,8 +206,8 @@ class Residualizer:
             pat = Pattern(name, params)
             if not node.children:
                 body = self._rewrite_expr(node.expr)
-            elif node.children[0].contraction and node.children[0].contraction.pattern is None:
-                # Generalization case
+            elif node.children[0].contraction and not self._is_pattern_contraction(node.children[0].contraction):
+                # Generalization case (MSG let-binding)
                 bindings = {}
                 for child in node.children:
                     bindings[child.contraction.var_name] = self._transform(child)
@@ -192,6 +220,39 @@ class Residualizer:
             else:
                 body = self._rewrite_expr(node.expr)
             self.rules.append(Rule(pat, body))
+
+    def _generate_root_entry(self):
+        """
+        Если корень — g-функция с let-binding детьми (от TOP MSG),
+        генерирует обёртку-точку входа: f(orig_vars) -> g(val1, val2, ...).
+        """
+        if self.root not in self.node_to_sig:
+            return
+        root_name, root_params = self.node_to_sig[self.root]
+        is_root_g = any(
+            c.contraction and self._is_pattern_contraction(c.contraction)
+            for c in self.root.children
+        )
+        if not is_root_g:
+            return
+        let_children = [
+            c for c in self.root.children
+            if c.contraction and not self._is_pattern_contraction(c.contraction)
+            and c.contraction.value is not None
+        ]
+        if not let_children:
+            return
+        # Строим подстановку: имя свежей var → residualized выражение
+        let_sub = {c.contraction.var_name: self._transform(c) for c in let_children}
+        entry_args = [let_sub.get(v.name, v) for v in root_params]
+        entry_vars = self._get_vars(FCall("__entry_aux__", entry_args))
+        if not entry_vars:
+            return
+        self.f_count += 1
+        entry_name = f"f{self.f_count}"
+        entry_pat = Pattern(entry_name, entry_vars)
+        entry_body = FCall(root_name, entry_args)
+        self.rules.insert(0, Rule(entry_pat, entry_body))
 
     def _transform(self, node: Node) -> Expr:
         if node.back_link:

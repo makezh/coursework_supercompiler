@@ -10,10 +10,16 @@ class Contraction:
     Описание ребра в дереве при ветвлении.
     Говорит: "Мы пошли по этой ветке, потому что заменили переменную var_name на паттерн pattern".
     Пример: var_name='x', pattern=[S v1]
+
+    narrowings — полное сужение (несколько переменных одновременно):
+      {var_name: Ctr-выражение}  — для паттернов с вложенными конструкторами
+    is_default — ветка "default" (catch-all), переменные остаются переменными
     """
     var_name: str
     pattern: Optional[Pattern]
     value: Optional[Expr] = None
+    narrowings: Optional[Dict] = None   # Dict[str, Expr]
+    is_default: bool = False
 
 @dataclass
 class HeapBinding:

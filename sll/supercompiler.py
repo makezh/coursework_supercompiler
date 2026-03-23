@@ -256,11 +256,12 @@ class Supercompiler:
             alpha.bag = TagBag.collect(alpha)
 
         # Пробрасываем типы для свежих переменных MSG в var_types alpha.
-        # Тип v_i = тип выражения sub1[v_i] в контексте alpha.
-        # Если sub1[v_i] — переменная, берём её тип напрямую.
+        # Тип v_i = тип выражения sub1[v_i] в контексте alpha (до обобщения).
+        old_var_types = dict(alpha.var_types)
         for v_name, val_expr in res.sub1.items():
-            if isinstance(val_expr, Var) and val_expr.name in alpha.var_types:
-                alpha.var_types[v_name] = alpha.var_types[val_expr.name]
+            inferred = self._infer_expr_type(val_expr, old_var_types)
+            if inferred is not None:
+                alpha.var_types[v_name] = inferred
 
         _remove_children_from_unprocessed(alpha, unprocessed)
         alpha.children = []  # Очищаем историю (забываем путь, который привел к beta)
@@ -283,6 +284,39 @@ class Supercompiler:
             unprocessed.append(child)
         unprocessed.insert(0, alpha)
         return True
+
+    def _collect_type_sub(self, template: TypeExpr, actual: TypeExpr, sub: dict):
+        """Собирает подстановку типовых параметров: template[param=actual]."""
+        if not template.params and template.name[0].islower():
+            sub[template.name] = actual
+        elif template.name == actual.name:
+            for t, a in zip(template.params, actual.params):
+                self._collect_type_sub(t, a, sub)
+
+    def _infer_expr_type(self, expr: Expr, var_types: Dict[str, TypeExpr]) -> Optional[TypeExpr]:
+        """Инферирует тип выражения в контексте var_types."""
+        if isinstance(expr, Var):
+            return var_types.get(expr.name)
+        if isinstance(expr, FCall):
+            sig = next((s for s in self.program.signatures if s.name == expr.name), None)
+            if sig is None:
+                return None
+            type_sub: dict = {}
+            for sig_arg_type, actual_arg in zip(sig.arg_types, expr.args):
+                actual_type = self._infer_expr_type(actual_arg, var_types)
+                if actual_type is not None:
+                    self._collect_type_sub(sig_arg_type, actual_type, type_sub)
+            ret = sig.ret_type
+            if type_sub:
+                from sll.driver import _instantiate_type
+                ret = _instantiate_type(ret, type_sub)
+            return ret
+        if isinstance(expr, Ctr):
+            for type_def in self.program.types:
+                if any(c.name == expr.name for c in type_def.constructors):
+                    if not type_def.params:
+                        return TypeExpr(type_def.name, [])
+        return None
 
     def _generalize_bottom(self, alpha: Node, beta: Node, unprocessed: list):
         """

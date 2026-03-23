@@ -6,26 +6,24 @@ digraph ProcessTree {
 
     node [fontname="Courier New"];
     edge [fontname="Courier New"];
+    start [label="(main x1)", shape=box, style="filled", fillcolor="lightgreen", color="darkgreen", penwidth=2.0];
+    start -> n0 [];
     n0 [label="(PROGRAM_FOREST )", shape=box];
     n0 -> n1 [label=""];
     n0 -> n2 [label=""];
     n1 [label="(eq (add x1 [S [Z]]) (add [S [Z]] x1))", shape=box];
-    n1 -> n3 [label="x1 -> (S v1)"];
-    n1 -> n4 [label="x1 -> (Z )"];
+    n1 -> n3 [label="x1 -> [S v1]"];
+    n1 -> n4 [label="x1 -> [Z]"];
     n2 [label="(eq (add v2 [S [Z]]) [S v2])", shape=box];
-    n2 -> n5 [label="v2 -> (S v5)"];
-    n2 -> n6 [label="v2 -> (Z )"];
+    n2 -> n5 [label="v2 -> [S v5]"];
+    n2 -> n6 [label="v2 -> [Z]"];
     n3 [label="(eq (add v1 [S [Z]]) (add [Z] [S v1]))", shape=box];
-    n3 -> n7 [label="v1 -> (S v2)"];
-    n3 -> n8 [label="v1 -> (Z )"];
+    n3 -> n7 [label="v1 -> [S v2]"];
+    n3 -> n8 [label="v1 -> [Z]"];
     n4 [label="[True]", shape=box];
-    n5 [label="(let v1 = v5 in (eq (add v1 [S [Z]]) [S v1]))", shape=box, style="filled", fillcolor="lightyellow", color="orange", penwidth=2.0];
-    n5 -> n9 [label=""];
-    n5 -> n10 [label=""];
+    n5 [label="(eq (add v5 [S [Z]]) [S v5])", shape=box];
+    n5 -> n2 [style=dashed, color=red, label="Folding"];
     n6 [label="[True]", shape=box];
     n7 [label="(eq (add v2 [S [Z]]) [S v2])", shape=box, style="filled", fillcolor="lightcyan", color="blue", penwidth=2.0];
     n8 [label="[True]", shape=box];
-    n9 [label="v5", shape=box];
-    n10 [label="(eq (add v1 [S [Z]]) [S v1])", shape=box];
-    n10 -> n2 [style=dashed, color=red, label="Folding"];
 }

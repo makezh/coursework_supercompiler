@@ -132,7 +132,7 @@ def main():
     out_path_base = os.path.join(OUTPUT_DIR, args.out)
 
     print(f"--- Exporting Graph to {OUTPUT_DIR}/ ---")
-    dot_code = to_dot(sc.tree, dev_mode=DEV_MODE)
+    dot_code = to_dot(sc.tree, dev_mode=DEV_MODE, start_expr=start_expr)
 
     graph_label = (
         f"Expression: {args.expr}\\n"

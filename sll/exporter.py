@@ -38,7 +38,7 @@ def to_tagged_str(expr: Expr) -> str:
         case _:
             return str(expr)
 
-def to_dot(root: Node, dev_mode=False) -> str:
+def to_dot(root: Node, dev_mode=False, start_expr=None) -> str:
     """
     Генерирует описание графа в формате DOT (Graphviz).
     """
@@ -61,6 +61,43 @@ def to_dot(root: Node, dev_mode=False) -> str:
     # Присваиваем ID корню
     node_ids[id(root)] = f"n{counter}"
     counter += 1
+
+    # --- Стартовый узел и GEN-ромб корня ---
+    # Оба рендерятся здесь, чтобы выстроить цепочку: start → GEN → root
+    has_start = start_expr is not None
+    has_root_gen = getattr(root, "gen_result", None) is not None and root.parent is None
+    root_gen_rendered = has_root_gen  # пометим, чтобы не рисовать повторно в BFS
+
+    if has_start:
+        start_label = str(start_expr).replace('"', '\\"')
+        lines.append(
+            f'    start [label="{start_label}", shape=box, style="filled", '
+            f'fillcolor="lightgreen", color="darkgreen", penwidth=2.0];'
+        )
+
+    if has_root_gen:
+        aux_counter += 1
+        _root_gen_id = f"gen{aux_counter}"
+        a = to_tagged_str(root.gen_alpha) if root.gen_alpha else "?"
+        g = to_tagged_str(root.gen_result)
+        gen_label = (
+            "GEN\\n"
+            f"α: {a}\\n"
+            f"gen: {g}"
+        ).replace('"', '\\"')
+        lines.append(
+            f'    {_root_gen_id} [label="{gen_label}", shape=diamond, style="filled", '
+            f'fillcolor="lightyellow", color="orange"];'
+        )
+
+    root_uid = node_ids[id(root)]
+    if has_start and has_root_gen:
+        lines.append(f'    start -> {_root_gen_id} [];')
+        lines.append(f'    {_root_gen_id} -> {root_uid} [];')
+    elif has_start:
+        lines.append(f'    start -> {root_uid} [];')
+    elif has_root_gen:
+        lines.append(f'    {_root_gen_id} -> {root_uid} [];')
 
     while queue:
         node = queue.pop(0)
@@ -88,6 +125,24 @@ def to_dot(root: Node, dev_mode=False) -> str:
 
         lines.append(f'    {uid} [label="{label}", shape=box{style_attr}];')
 
+        # 1b. GEN-ромб для самого узла (если он был обобщён in-place, как корень при TOP)
+        # Корень пропускаем — он уже отрендерен в блоке выше
+        if getattr(node, "gen_result", None) is not None and node.parent is None and not root_gen_rendered:
+            aux_counter += 1
+            gen_id = f"gen{aux_counter}"
+            a = to_tagged_str(node.gen_alpha) if node.gen_alpha else "?"
+            g = to_tagged_str(node.gen_result)
+            gen_label = (
+                "GEN\\n"
+                f"α: {a}\\n"
+                f"gen: {g}"
+            ).replace('"', '\\"')
+            lines.append(
+                f'    {gen_id} [label="{gen_label}", shape=diamond, style="filled", '
+                f'fillcolor="lightyellow", color="orange"];'
+            )
+            lines.append(f'    {gen_id} -> {uid} [];')
+
         # 2. Ссылка назад (Folding)
         if node.back_link:
             target_id = node_ids.get(id(node.back_link))
@@ -108,17 +163,28 @@ def to_dot(root: Node, dev_mode=False) -> str:
             # Подпись на ребре (если это ветвление или обобщение)
             edge_label = ""
             if child.contraction:
-                v = child.contraction.var_name
-                if child.contraction.pattern:
-                    # Ветвление: x = [S v1]
-                    p = str(child.contraction.pattern)
-                    edge_label = f"{v} -> {p}"
-                else:
+                c = child.contraction
+                if c.narrowings is not None:
+                    # Полное сужение нескольких переменных
+                    parts = [f"{k} -> {v}" for k, v in c.narrowings.items()
+                             if not (hasattr(v, 'name') and v.name == k)]
+                    edge_label = ", ".join(parts) if parts else "default"
+                elif c.is_default:
+                    edge_label = "default"
+                elif c.pattern is not None:
+                    # Одиночное ветвление: x = [S v1]
+                    edge_label = f"{c.var_name} -> {c.pattern}"
+                elif c.value is not None:
                     # Обобщение: let v = ...
-                    edge_label = f"let {v} = {to_tagged_str(child.contraction.value)}"
+                    edge_label = f"let {c.var_name} = {to_tagged_str(c.value)}"
 
-
-            is_branch_edge = bool(child.contraction and child.contraction.pattern)
+            is_branch_edge = bool(
+                child.contraction and (
+                    child.contraction.pattern is not None or
+                    child.contraction.narrowings is not None or
+                    child.contraction.is_default
+                )
+            )
             from_id = uid
 
             if dev_mode and getattr(child, "driven_rule", None) is not None:
@@ -137,7 +203,7 @@ def to_dot(root: Node, dev_mode=False) -> str:
                 lines.append(f'    {uid} -> {drive_id} [label="{branch_label}"];')
                 from_id = drive_id
 
-            if dev_mode and getattr(child, "gen_result", None) is not None:
+            if getattr(child, "gen_result", None) is not None:
                 aux_counter += 1
                 gen_id = f"gen{aux_counter}"
 

@@ -111,70 +111,220 @@ class Driver:
             case _:
                 return StopStep()
 
+    def _apply_sub_fully(self, expr: Expr, sub: Dict[str, Expr]) -> Expr:
+        """Применяет подстановку транзитивно (до стабилизации)."""
+        result = expr
+        for _ in range(200):
+            new_result = substitute(result, sub)
+            if new_result == result:
+                return result
+            result = new_result
+        return result
+
+    def _get_call_vars(self, expr: FCall) -> List[Var]:
+        """Возвращает переменные из аргументов вызова (в порядке первого вхождения)."""
+        result = []
+        seen = set()
+
+        def collect(e):
+            match e:
+                case Var(name):
+                    if name not in seen:
+                        seen.add(name)
+                        result.append(e)
+                case Ctr(_, args) | FCall(_, args):
+                    for a in args:
+                        collect(a)
+        for arg in expr.args:
+            collect(arg)
+        return result
+
+    def _compute_full_rule_narrowing(
+        self, rule, expr: FCall, var_types: Dict[str, TypeExpr]
+    ) -> Optional[Tuple[Dict[str, Expr], Dict[str, Expr], Dict[str, TypeExpr]]]:
+        """
+        Вычисляет полную подстановку, нужную для применения правила к expr.
+        Возвращает (running_sub, rule_bindings, new_var_types) или None при MatchFail.
+        - running_sub:    все сужения переменных (включая промежуточные)
+        - rule_bindings:  переменные паттерна правила → значения (для тела правила)
+        - new_var_types:  типы свежих переменных
+        """
+        pat_args = rule.pattern.params
+        if len(pat_args) != len(expr.args):
+            return None
+
+        running_sub: Dict[str, Expr] = {}
+        rule_bindings: Dict[str, Expr] = {}
+        new_var_types = dict(var_types)
+
+        # Worklist: (pat_arg, orig_call_arg)
+        # Храним оригинальные выражения; running_sub применяем при каждом извлечении.
+        work = list(zip(pat_args, list(expr.args)))
+
+        max_iters = 500
+        iters = 0
+        while work:
+            iters += 1
+            if iters > max_iters:
+                return None
+
+            pat, e_orig = work.pop(0)
+            e_subst = self._apply_sub_fully(e_orig, running_sub)
+
+            res = match_term(pat, e_subst)
+
+            if isinstance(res, MatchFail):
+                return None
+            elif isinstance(res, MatchSuccess):
+                rule_bindings.update(res.bindings)
+            elif isinstance(res, MatchNarrowing):
+                var_name = res.var_name
+                constr_name = res.constr_name
+
+                if var_name not in new_var_types:
+                    return None
+
+                var_type_expr = new_var_types[var_name]
+                type_name = var_type_expr.name
+                if type_name not in self.type_map:
+                    return None
+
+                type_def = self.type_map[type_name]
+                constr_def = next((c for c in type_def.constructors if c.name == constr_name), None)
+                if not constr_def:
+                    return None
+
+                type_param_subst = {
+                    param: arg
+                    for param, arg in zip(type_def.params, var_type_expr.params)
+                }
+
+                fresh_vars = []
+                for arg_type in constr_def.arg_types:
+                    v = Var(self.name_gen.fresh_var())
+                    fresh_vars.append(v)
+                    new_var_types[v.name] = _instantiate_type(arg_type, type_param_subst)
+
+                running_sub[var_name] = Ctr(constr_name, fresh_vars)
+                # Повторяем для той же пары с обновлённым running_sub
+                work.insert(0, (pat, e_orig))
+
+        return running_sub, rule_bindings, new_var_types
+
+    def _is_default_redundant(self, branches, var_types: Dict[str, TypeExpr]) -> bool:
+        """
+        Возвращает True, если catch-all ветка недостижима:
+        специфические ветки уже покрывают ВСЕ конструкторы единственной
+        дискриминируемой переменной.
+        Работает только для случая, когда во всех ветках сужается ровно одна
+        и та же переменная (остальные остаются как есть).
+        """
+        if not branches:
+            return False
+
+        really_narrowed_sets = []
+        for _, contraction, _, _ in branches:
+            narrowings = contraction.narrowings or {}
+            really_narrowed = frozenset(
+                v for v, e in narrowings.items()
+                if not (isinstance(e, Var) and e.name == v)
+            )
+            really_narrowed_sets.append(really_narrowed)
+
+        # Пересечение: переменная, которая сужается в КАЖДОЙ ветке
+        common = really_narrowed_sets[0]
+        for s in really_narrowed_sets[1:]:
+            common = common & s
+
+        # Только если ровно одна общая переменная
+        if len(common) != 1:
+            return False
+
+        disc_var = next(iter(common))
+        if disc_var not in var_types:
+            return False
+
+        type_name = var_types[disc_var].name
+        if type_name not in self.type_map:
+            return False
+
+        all_ctrs = {c.name for c in self.type_map[type_name].constructors}
+
+        # Какие конструкторы disc_var покрыты на верхнем уровне
+        covered = set()
+        for _, contraction, _, _ in branches:
+            narrowings = contraction.narrowings or {}
+            e = narrowings.get(disc_var)
+            if isinstance(e, Ctr):
+                covered.add(e.name)
+
+        return covered >= all_ctrs
+
     def _drive_call(self, expr: FCall, var_types: Dict[str, TypeExpr]) -> DriveStep:
         """
         Rule-Based Driving для вызова функции.
+        Использует полное сужение (full narrowing) по каждому правилу:
+        одна ветка = одно правило = все нужные сужения сразу.
         """
         rules = [r for r in self.program.rules if r.pattern.name == expr.name]
 
-        # Проверяем, не являются ли аргументы вызовами функций
-        # в тех позициях, где правила ожидают конструкторы.
-        # Если да — уходим в Nested Driving, чтобы "выдавить" конструкторы наружу.
+        # Если аргумент — FCall в позиции, где правило ожидает конструктор — nested driving.
         for rule in rules:
             for i, p in enumerate(rule.pattern.params):
-                if not isinstance(p, Var) and isinstance(expr.args[i], FCall):
+                if not isinstance(p, Var) and i < len(expr.args) and isinstance(expr.args[i], FCall):
                     return self._drive_nested(expr, var_types)
+
         branches = []
+        seen_keys: List[str] = []   # дедупликация веток
 
         for rule in rules:
-            pat_dummy = FCall("dummy", rule.pattern.params)
-            call_dummy = FCall("dummy", expr.args)
+            result = self._compute_full_rule_narrowing(rule, expr, var_types)
 
-            res = match_term(pat_dummy, call_dummy)
+            if result is None:
+                continue  # MatchFail — правило неприменимо
 
-            match res:
-                case MatchSuccess(bindings):
-                    if branches:
-                        # Catch-all правило после специфических: нужно добавить ветки
-                        # для ВСЕХ конструкторов типа, не покрытых предыдущими MatchNarrowing.
-                        # Иначе теряем случаи B, C, D когда покрыт только A.
-                        narrowed_var = branches[0][1].var_name
-                        covered = {b[1].pattern.name for b in branches
-                                   if b[1] and b[1].pattern}
-                        if narrowed_var in var_types:
-                            type_name = var_types[narrowed_var].name
-                            if type_name in self.type_map:
-                                for constr_def in self.type_map[type_name].constructors:
-                                    if constr_def.name not in covered:
-                                        branch = self._create_branch(
-                                            expr, narrowed_var, constr_def.name, var_types)
-                                        if branch:
-                                            branches.append(branch)
-                        return VariantStep(branches=branches)
+            running_sub, rule_bindings, new_var_types = result
 
-                    # Если препятствий не было — редуцируем
-                    new_expr = substitute(rule.body, bindings)
-                    return TransientStep(next_expr=new_expr, rule_pat=rule.pattern)
+            # Финальная подстановка для оригинальных переменных вызова
+            orig_vars = self._get_call_vars(expr)
+            final_narrowing: Dict[str, Expr] = {}
+            for v in orig_vars:
+                final_narrowing[v.name] = self._apply_sub_fully(Var(v.name), running_sub)
 
-                case MatchNarrowing(var_name, constr_name, _):
-                    # Добавляем ветку только если этот конструктор ещё не покрыт.
-                    # Два правила с одним верхним конструктором (fab [Cons [A] xs]
-                    # и fab [Cons x xs]) не должны порождать дублирующие Cons-ветки.
-                    covered_now = {b[1].pattern.name for b in branches
-                                   if b[1] and b[1].pattern}
-                    if constr_name not in covered_now:
-                        branch = self._create_branch(expr, var_name, constr_name, var_types)
-                        if branch:
-                            branches.append(branch)
+            body = substitute(rule.body, rule_bindings)
 
-                case MatchFail():
+            has_real_narrowing = any(
+                not isinstance(final_narrowing[v.name], Var) or final_narrowing[v.name].name != v.name
+                for v in orig_vars
+            )
+
+            if not has_real_narrowing:
+                # Пустое сужение = catch-all правило совпало напрямую
+                if not branches:
+                    return TransientStep(next_expr=body, rule_pat=rule.pattern)
+                else:
+                    # Catch-all после специфических веток → default branch,
+                    # но только если специфические ветки НЕ покрывают все конструкторы.
+                    if not self._is_default_redundant(branches, var_types):
+                        contraction = Contraction(var_name="", pattern=None, is_default=True)
+                        branches.append((body, contraction, var_types.copy(), rule.pattern))
+                    return VariantStep(branches=branches)
+            else:
+                # Специфическая ветка с сужением
+                key = str(sorted(
+                    (k, str(v)) for k, v in final_narrowing.items()
+                    if not (isinstance(v, Var) and v.name == k)
+                ))
+                if key in seen_keys:
                     continue
+                seen_keys.append(key)
 
-        # Если вышли из цикла и есть ветки — возвращаем их
+                contraction = Contraction(var_name="", pattern=None, narrowings=final_narrowing)
+                branches.append((body, contraction, new_var_types, rule.pattern))
+
         if branches:
             return VariantStep(branches=branches)
 
-        # Если веток нет, значит нам мешает вложенный вызов
         return self._drive_nested(expr, var_types)
 
     def _create_branch(self, expr: FCall, var_name: str, constr_name: str, var_types: Dict[str, TypeExpr]) -> Optional[
@@ -241,18 +391,24 @@ class Driver:
 
                     case VariantStep(branches):
                         new_branches = []
-                        for _, contraction, branch_var_types, applied_pat in branches:
+                        for branch_expr, contraction, branch_var_types, applied_pat in branches:
 
-                            # Извлекаем информацию о сужении: какую переменную на какой паттерн меняем
-                            v_name = contraction.var_name
-                            pat = contraction.pattern
+                            if contraction.narrowings is not None:
+                                # Полное сужение: применяем все сужения к внешнему выражению
+                                global_branch_expr = substitute(expr, contraction.narrowings)
+                            elif contraction.is_default:
+                                # Catch-all: заменяем внутренний FCall его результатом
+                                new_args = list(expr.args)
+                                new_args[i] = branch_expr
+                                global_branch_expr = FCall(expr.name, new_args,
+                                                           lineno=expr.lineno, tag=expr.tag)
+                            else:
+                                # Одиночное сужение (обратная совместимость)
+                                v_name = contraction.var_name
+                                pat = contraction.pattern
+                                constr_expr = Ctr(pat.name, pat.params)
+                                global_branch_expr = substitute(expr, {v_name: constr_expr})
 
-                            constr_expr = Ctr(pat.name, pat.params)
-
-                            # Применяем подстановку {x: [S v2]} ко всему выражению
-                            global_branch_expr = substitute(expr, {v_name: constr_expr})
-
-                            # Добавляем обновленное выражение в ветку
                             new_branches.append((global_branch_expr, contraction, branch_var_types, applied_pat))
 
                         return VariantStep(branches=new_branches)
