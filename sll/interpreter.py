@@ -1,5 +1,5 @@
 from sll.ast_nodes import FCall, Ctr, Var
-from sll.matching import match, substitute
+from sll.matching import match, substitute, MatchSuccess
 
 
 def step(expr, program):
@@ -33,10 +33,10 @@ def step(expr, program):
                 # Сопоставляем все аргументы
                 for call_arg, pat_arg in zip(args, rule.pattern.params):
                     res = match(pat_arg, call_arg)
-                    if res is None:
+                    if not isinstance(res, MatchSuccess):
                         match_success = False
                         break
-                    bindings.update(res)
+                    bindings.update(res.bindings)
 
                 if match_success:
                     # Нашли правило! Делаем подстановку (rewrite)
