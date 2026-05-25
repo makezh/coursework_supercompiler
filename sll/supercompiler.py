@@ -9,6 +9,7 @@ from sll.matching import match, MatchSuccess
 from sll.preprocessor import add_tags, Tagger
 from sll.bag_of_tags import TagBag
 from sll.tagging import TagAllocator
+from sll.output_format import BOTTOM as FMT_BOTTOM
 
 
 def _find_renaming_ancestor(node: Node) -> Node | None:
@@ -38,13 +39,15 @@ def _is_renaming(t1: Expr, t2: Expr) -> bool:
 
 
 class Supercompiler:
-    def __init__(self, program: Program, strategy: str = "HE", gen_type: str = "TOP"):
+    def __init__(self, program: Program, strategy: str = "HE", gen_type: str = "TOP",
+                 format_level: str = "OFF"):
         self.program = program
         self.driver = Driver(program)
         self.hypercycle_roots: Dict[str, Node] = {}
         self.tree: Optional[Node] = None
         self.strategy = strategy
         self.gen_type = gen_type
+        self.format_level = format_level
 
         # Если выбрана стратегия TAG, нам нужно один раз разметить всю программу
         self.tag_allocator = None
@@ -74,6 +77,9 @@ class Supercompiler:
             self.tag_allocator.process_expr(start_expr)
 
         self.tree = self._create_node(start_expr, start_var_types)
+        if self.format_level != "OFF":
+            self.tree.output_format = FMT_BOTTOM
+            self.tree.format_component_root = self.tree
 
         # Очередь необработанных узлов
         unprocessed = [self.tree]
@@ -409,6 +415,11 @@ class Supercompiler:
 
         # 5) Фиксируем лес
         self.hypercycle_roots = processed_configs
+
+        if self.format_level != "OFF":
+            for root_node in self.hypercycle_roots.values():
+                root_node.output_format = FMT_BOTTOM
+                root_node.format_component_root = root_node
 
         # 6) Выбираем стартовый корень корректно:
         # если start_canon не нашёлся (редко), берём корень по канону после build_tree(start_expr)

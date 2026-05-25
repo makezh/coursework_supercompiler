@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, Optional
 
-from sll.ast_nodes import Var, Ctr, FCall, IntLit, Expr
+from sll.ast_nodes import Var, Ctr, FCall, IntLit, Expr, Pattern
 
 
 # --- Результаты сопоставления ---
@@ -72,8 +72,7 @@ def match(pattern: Expr, expr: Expr) -> MatchResult:
                 case _:
                     return MatchFail()
 
-        # 3. Конструктор в паттерне ([Cons ...])
-        case Ctr(p_name, p_args):
+        case Ctr(p_name, p_args) | Pattern(p_name, p_args) if p_name and p_name[0].isupper():
             match expr:
                 case Ctr(c_name, e_args):
                     if p_name != c_name or len(p_args) != len(e_args):

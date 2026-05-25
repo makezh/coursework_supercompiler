@@ -108,6 +108,10 @@ def to_dot(root: Node, dev_mode=False, start_expr=None) -> str:
         else:
             label = str(node.expr).replace('"', '\\"')
 
+        if node.output_format is not None:
+            fmt_label = str(node.output_format).replace('"', '\\"')
+            label = f"{label}\\nfmt: {fmt_label}"
+
         lines.append(f'    {uid} [label="{label}", shape=box{style_attr}];')
 
         # GEN-ромб корня рендерится в блоке до BFS (как подпись на стрелке start→root)

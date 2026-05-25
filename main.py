@@ -32,6 +32,9 @@ def main():
                     help="Generalization type: TOP (rewrite ancestor) or BOTTOM (rewrite current)")
     parser.add_argument("-d", "--dev", choices=['ON', 'OFF'], default='OFF',
                     help="Developer mode: ON (show tags in graph) or OFF (hide tags)")
+    parser.add_argument("-f", "--format", choices=['OFF', 'SIMPLE', 'PARAM', 'ACTIVE'],
+                    default='OFF',
+                    help="Output format level: OFF | SIMPLE | PARAM | ACTIVE")
 
     args = parser.parse_args()
     DEV_MODE = (args.dev == 'ON')
@@ -117,7 +120,8 @@ def main():
     print(f"    Generalize type: {args.gen}")
     print(f"    Context: {start_var_types}")
 
-    sc = Supercompiler(prog, strategy=args.strategy, gen_type=args.gen)
+    sc = Supercompiler(prog, strategy=args.strategy, gen_type=args.gen,
+                       format_level=args.format)
     if args.gen == 'TOP':
         print("Running Classical TOP-down Supercompilation...")
         sc.build_tree(start_expr, start_var_types)

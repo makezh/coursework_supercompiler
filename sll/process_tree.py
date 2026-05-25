@@ -1,7 +1,10 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple, Dict, Set, TYPE_CHECKING
 from sll.ast_nodes import Expr, Pattern, TypeExpr
 from collections import Counter
+
+if TYPE_CHECKING:
+    from sll.output_format import OutputFormat
 
 
 @dataclass
@@ -74,6 +77,11 @@ class Node:
     gen_result: Optional[Expr] = None  # во что обобщили
 
     is_basis_ref: bool = False         # узел является ссылкой на корень другого дерева в лесу
+
+    output_format: Optional['OutputFormat'] = None
+    format_component_root: Optional['Node'] = None
+    frozen_params: Set[str] = field(default_factory=set)
+    decomposed: bool = False
 
     def add_child(self, node: 'Node', contraction: Optional[Contraction] = None):
         node.parent = self
