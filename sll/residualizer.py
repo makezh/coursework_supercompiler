@@ -102,6 +102,7 @@ class Residualizer:
                      FCall(start_sig_name, list(start_params)))
             )
 
+            self._pull_unresolved_originals()
             return Program(self.rules, self._original_types(), [])
 
         # обычный режим
@@ -109,7 +110,49 @@ class Residualizer:
         for node in list(self.node_to_sig.keys()):
             self._generate_definition(node)
         self._generate_root_entry()
+        self._pull_unresolved_originals()
         return Program(self.rules, self._original_types(), [])
+
+    def _pull_unresolved_originals(self):
+        if self.original_program is None:
+            return
+        defined = {r.pattern.name for r in self.rules}
+        called = set()
+
+        def collect(e):
+            match e:
+                case FCall(name, args):
+                    called.add(name)
+                    for a in args:
+                        collect(a)
+                case Ctr(_, args):
+                    for a in args:
+                        collect(a)
+                case Let(bindings, body):
+                    for _, v in bindings:
+                        collect(v)
+                    collect(body)
+
+        for r in self.rules:
+            collect(r.body)
+
+        queue = list(called - defined)
+        while queue:
+            name = queue.pop()
+            if name in defined:
+                continue
+            orig_rules = [r for r in self.original_program.rules if r.pattern.name == name]
+            if not orig_rules:
+                continue
+            self.rules.extend(orig_rules)
+            defined.add(name)
+            for r in orig_rules:
+                new_called = set()
+                old_called = called.copy()
+                collect(r.body)
+                for c in called - old_called:
+                    if c not in defined:
+                        queue.append(c)
 
     @staticmethod
     def _is_pattern_contraction(c) -> bool:

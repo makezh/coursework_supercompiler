@@ -104,9 +104,7 @@ STRATEGY_MATRIX = [
 ]
 
 
-KNOWN_BROKEN = {
-    ("fabc", "HE", "BOTTOM"),
-}
+KNOWN_BROKEN = set()
 
 
 # ----------------------------------------------------------------------

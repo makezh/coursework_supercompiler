@@ -129,8 +129,7 @@ class Supercompiler:
                     did_gen = self._generalize(dangerous_alpha, beta, unprocessed)
                 else:
                     print(f"[GEN] alpha={dangerous_alpha.expr}  beta={beta.expr} gen_type={self.gen_type}")
-                    self._generalize_bottom(dangerous_alpha, beta, unprocessed)
-                    did_gen = True
+                    did_gen = self._generalize_bottom(dangerous_alpha, beta, unprocessed)
                 if did_gen:
                     continue
                 # did_gen=False: обобщение отложено, прогоняем beta нормально
@@ -336,6 +335,12 @@ class Supercompiler:
         """
         res = msg(alpha.expr, beta.expr)
 
+        if _is_renaming(alpha.expr, res.gen):
+            if _is_renaming(beta.expr, alpha.expr):
+                beta.back_link = alpha
+                return True
+            return False
+
         # Книжный случай: разные головы -> MSG дырка -> делаем контекстный Let по beta
         if isinstance(res.gen, Var) and isinstance(beta.expr, FCall):
             f_name = beta.expr.name
@@ -357,7 +362,7 @@ class Supercompiler:
                 beta.bag = TagBag.collect(beta)
 
             unprocessed.insert(0, beta)
-            return
+            return True
 
         # Обычный путь (MSG сохраняет структуру)
         beta.gen_alpha = alpha.expr
@@ -374,7 +379,7 @@ class Supercompiler:
             beta.bag = TagBag.collect(beta)
 
         unprocessed.insert(0, beta)
-        return
+        return True
 
     def run_hypercycle(self, start_expr, start_var_types):
         """

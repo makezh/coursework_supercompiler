@@ -92,7 +92,7 @@ class TestSupervisorFullIntegration(unittest.TestCase):
         # Если мы получили результат — значит, HE и MSG отработали.
         self.assertTrue(len(res) > 0)
 
-    @unittest.skip("известная проблема: обобщение addAcc уходит в let-цепочку")
+    @unittest.skip("известная проблема: обобщение не сворачивает рост аккумулятора")
     def test_4_turchin_relation(self):
         """
         Тест 4: addAcc(a, b).
