@@ -1,6 +1,7 @@
 from collections import Counter
 from typing import Optional
 
+from sll.ast_nodes import Ctr, FCall, Let
 from sll.process_tree import Node
 
 
@@ -16,29 +17,32 @@ class TagBag:
         bag[tag] += weight
 
     @staticmethod
+    def _walk_expr(bag: Counter, expr, weight: int):
+        TagBag._add_tag(bag, getattr(expr, "tag", None), weight)
+        match expr:
+            case Ctr(_, args) | FCall(_, args):
+                for a in args:
+                    TagBag._walk_expr(bag, a, weight)
+            case Let(bindings, body):
+                for _, val in bindings:
+                    TagBag._walk_expr(bag, val, weight)
+                TagBag._walk_expr(bag, body, weight)
+
+    @staticmethod
     def collect(node: Node) -> Counter:
-        """
-        Возвращает tag-bag для конфигурации узла (heap/focus/stack).
-        """
         bag = Counter()
-
-        # focus root tag: 3 * tag(focus)
-        TagBag._add_tag(bag, getattr(node.expr, "tag", None), TagBag.W_FOCUS)
-
-        # heap root tags: 2 * tag(rhs)
+        TagBag._walk_expr(bag, node.expr, TagBag.W_FOCUS)
         for hb in getattr(node, "heap", []):
-            TagBag._add_tag(bag, getattr(hb.expr, "tag", None), TagBag.W_HEAP)
-
-        # stack root tags: 5 * tag(frame)
+            TagBag._walk_expr(bag, hb.expr, TagBag.W_HEAP)
         for fr in getattr(node, "stack", []):
             TagBag._add_tag(bag, getattr(fr, "tag", None), TagBag.W_STACK)
-
         return bag
 
     @staticmethod
     def is_dangerous(old, new):
         if not old:
             return False
-        if set(old.keys()) != set(new.keys()):
-            return False
-        return sum(new.values()) >= sum(old.values())
+        for tag, count in old.items():
+            if new.get(tag, 0) < count:
+                return False
+        return True
