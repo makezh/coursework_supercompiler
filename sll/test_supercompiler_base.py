@@ -1,6 +1,7 @@
 import unittest
 from sll.parser import parse, Parser, tokenize
 from sll.supercompiler import Supercompiler
+from sll.ast_nodes import TypeExpr
 
 CODE = """
 type [Nat] : Z | S [Nat] .
@@ -17,7 +18,8 @@ class TestSupercompilerBasic(unittest.TestCase):
     def test_tree_construction_add(self):
         # Строим дерево для (add a b)
         expr = Parser(tokenize("(add a b)")).parse_expr()
-        self.sc.build_tree(expr)
+        nat = TypeExpr("Nat", [])
+        self.sc.build_tree(expr, {"a": nat, "b": nat})
 
         root = self.sc.tree
         self.assertIsNotNone(root)

@@ -9,7 +9,7 @@ from sll.matching import match, MatchSuccess
 from sll.preprocessor import add_tags, Tagger
 from sll.bag_of_tags import TagBag
 from sll.tagging import TagAllocator
-from sll.output_format import BOTTOM as FMT_BOTTOM
+from sll.output_format import BOTTOM as FMT_BOTTOM, gen_format, match_value
 
 
 def _find_renaming_ancestor(node: Node) -> Node | None:
@@ -136,6 +136,9 @@ class Supercompiler:
                 # did_gen=False: обобщение отложено, прогоняем beta нормально
 
             self._drive_node_with_step(beta, step, unprocessed)
+
+        if self.format_level in ("SIMPLE", "PARAM", "ACTIVE") and not self.hypercycle_roots:
+            self.build_simple_formats()
 
     def _create_node(self, expr: Expr, var_types: Dict[str, TypeExpr]) -> Node:
         """Создает узел и сразу считает мешок тегов, если нужно."""
@@ -440,6 +443,9 @@ class Supercompiler:
 
         self.tree = forest_root
 
+        if self.format_level in ("SIMPLE", "PARAM", "ACTIVE"):
+            self.build_simple_formats()
+
     def _prune_forest(self):
         """
         Проходит по всем построенным деревьям и обрезает ветки,
@@ -474,3 +480,78 @@ class Supercompiler:
 
         collect(root)
         return list(targets)
+
+    def build_simple_formats(self):
+        if self.hypercycle_roots:
+            bases = list(self.hypercycle_roots.values())
+        else:
+            bases = [self.tree]
+
+        for b in bases:
+            if b.output_format is None:
+                b.output_format = FMT_BOTTOM
+                b.format_component_root = b
+
+        changed = True
+        while changed:
+            changed = False
+            for b in bases:
+                new_F = self._compute_format_for_basis(b, bases)
+                if str(new_F) != str(b.output_format):
+                    b.output_format = new_F
+                    changed = True
+
+    def _compute_format_for_basis(self, basis: Node, all_bases: List[Node]):
+        F = basis.output_format
+        inner_changed = True
+        while inner_changed:
+            inner_changed = False
+            for v in self._branch_values(basis, all_bases):
+                if v is None:
+                    continue
+                if not match_value(F, v):
+                    F = gen_format(F, v)
+                    inner_changed = True
+        return F
+
+    def _branch_values(self, basis: Node, all_bases: List[Node]) -> list:
+        def is_pattern_contraction(c):
+            return c is not None and (c.pattern is not None or c.narrowings is not None or c.is_default)
+
+        def find_ref_basis(node: Node):
+            for b in all_bases:
+                if b is not node and _is_renaming(node.expr, b.expr):
+                    return b
+            return None
+
+        def walk(n: Node) -> list:
+            if n.back_link is not None:
+                tgt_fmt = n.back_link.output_format
+                if tgt_fmt is None or tgt_fmt.is_bottom:
+                    return [None]
+                return [tgt_fmt.expr]
+            if n.is_basis_ref:
+                ref_b = find_ref_basis(n)
+                if ref_b and ref_b.output_format and not ref_b.output_format.is_bottom:
+                    return [ref_b.output_format.expr]
+                return [None]
+            if not n.children:
+                return [n.expr]
+            if any(is_pattern_contraction(c.contraction) for c in n.children):
+                out = []
+                for c in n.children:
+                    out.extend(walk(c))
+                return out
+            if isinstance(n.expr, Ctr):
+                child_lists = [walk(c) for c in n.children]
+                if not all(len(cl) == 1 for cl in child_lists):
+                    return [None]
+                args = [cl[0] for cl in child_lists]
+                if any(a is None for a in args):
+                    return [None]
+                return [Ctr(n.expr.name, args)]
+            if len(n.children) == 1:
+                return walk(n.children[0])
+            return [None]
+
+        return walk(basis)
