@@ -105,9 +105,7 @@ STRATEGY_MATRIX = [
 
 
 KNOWN_BROKEN = {
-    ("add3", "TAG", "BOTTOM"),
-    ("fabc", "HE",  "BOTTOM"),
-    ("fabc", "TAG", "BOTTOM"),
+    ("fabc", "HE", "BOTTOM"),
 }
 
 

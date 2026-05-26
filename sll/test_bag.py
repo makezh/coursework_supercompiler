@@ -15,9 +15,10 @@ class TestBagOfTags(unittest.TestCase):
 
         bag = TagBag.collect(node)
 
-        self.assertEqual(bag[1], TagBag.W_FOCUS)
-        self.assertNotIn(None, bag, "None не должен попадать в мешок")
-        self.assertEqual(len(bag), 1, "В focus только корневой тег [Cons]")
+        self.assertEqual(bag[1], TagBag.W_FOCUS, "Корневой Cons")
+        self.assertEqual(bag[3], TagBag.W_FOCUS, "Вложенный Nil тоже учитывается")
+        self.assertNotIn(None, bag)
+        self.assertEqual(len(bag), 2)
 
     def test_whistle_strict_growth(self):
         """Свисток должен срабатывать при росте количества тех же тегов."""
@@ -27,13 +28,13 @@ class TestBagOfTags(unittest.TestCase):
         self.assertTrue(TagBag.is_dangerous(bag_old, bag_new),
                         "Должен свистеть: количество тега 1 увеличилось")
 
-    def test_whistle_different_keys_safe(self):
-        """Реализация консервативна: разные key-set → не дёргаем свисток."""
+    def test_whistle_superset_with_new_tags(self):
+        """new ⊇ old по multiset inclusion → свисток."""
         bag_old = Counter({1: 1})
         bag_new = Counter({1: 1, 5: 1})
 
-        self.assertFalse(TagBag.is_dangerous(bag_old, bag_new),
-                          "Текущий is_dangerous требует совпадения set ключей")
+        self.assertTrue(TagBag.is_dangerous(bag_old, bag_new),
+                         "Должен свистеть: новый мешок включает старый")
 
     def test_whistle_not_a_superset(self):
         """Не должен свистеть, если хотя бы один старый тег пропал или уменьшился."""
