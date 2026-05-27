@@ -1,0 +1,85 @@
+{# Внутренний фрагмент: тот же контент, что в report.html, но без <html>/<head> — для AJAX-вставки #}
+
+<input type="radio" name="tab2" id="tab2-OFF">
+<input type="radio" name="tab2" id="tab2-SIMPLE">
+<input type="radio" name="tab2" id="tab2-PARAM">
+<input type="radio" name="tab2" id="tab2-ACTIVE" checked>
+
+<div class="tabs">
+    <label for="tab2-OFF">OFF</label>
+    <label for="tab2-SIMPLE">SIMPLE</label>
+    <label for="tab2-PARAM">PARAM</label>
+    <label for="tab2-ACTIVE">ACTIVE</label>
+</div>
+
+<div class="panels">
+    {% for level in ["OFF", "SIMPLE", "PARAM", "ACTIVE"] %}
+    {% set r = results[level] %}
+    <div class="tab-panel p-{{ level }}">
+        {% if r.error %}
+            <div class="error">Ошибка на уровне {{ level }}:
+{{ r.error }}</div>
+        {% else %}
+            <div class="graph">
+                {% if r.svg %}{{ r.svg | safe }}
+                {% else %}<div class="graph-missing">Граф недоступен (нужен <code>graphviz</code>).</div>
+                {% endif %}
+            </div>
+
+            <div class="stats">
+                <div class="stat-cell"><div class="stat-label">функций</div><div class="stat-value">{{ r.stats.num_functions }}</div></div>
+                <div class="stat-cell"><div class="stat-label">правил</div><div class="stat-value">{{ r.stats.num_rules }}</div></div>
+                <div class="stat-cell"><div class="stat-label">макс. арность</div><div class="stat-value">{{ r.stats.max_arity }}</div></div>
+                <div class="stat-cell"><div class="stat-label">арность рекурсии</div><div class="stat-value">{{ r.stats.recursion_arity }}</div></div>
+            </div>
+
+            {% if r.formats %}
+            <h2>Форматы базисных конфигураций</h2>
+            <table class="formats">
+                <thead><tr><th>Базис</th><th>Формат</th><th>Параметры</th></tr></thead>
+                <tbody>
+                {% for f in r.formats %}
+                    <tr class="{% if f.decomposed %}decomposed{% endif %}">
+                        <td>{{ f.basis_expr }}</td>
+                        <td>{{ f.format_str }}</td>
+                        <td>
+                            {% for p in f.frozen_params %}<span class="tag frozen">#{{ p }}</span>{% endfor %}
+                            {% for v in f.output_vars %}<span class="tag output">{{ v }}</span>{% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            <h2>Резидуальная программа</h2>
+            <pre class="code">{{ r.residual_sll }}</pre>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+{% if effect %}
+<div class="effect-summary">
+    <h3>Сводка эффекта OFF → ACTIVE</h3>
+    <ul>{% for key, msg in effect.items() %}<li>{{ msg }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<style>
+{# Дублируем :checked-селекторы для второго набора табов внутри фрагмента #}
+#tab2-OFF:checked      ~ .tabs label[for="tab2-OFF"],
+#tab2-SIMPLE:checked   ~ .tabs label[for="tab2-SIMPLE"],
+#tab2-PARAM:checked    ~ .tabs label[for="tab2-PARAM"],
+#tab2-ACTIVE:checked   ~ .tabs label[for="tab2-ACTIVE"] {
+    background: #fff;
+    color: #2d3748;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+}
+#tab2-OFF:checked     ~ .panels .tab-panel.p-OFF,
+#tab2-SIMPLE:checked  ~ .panels .tab-panel.p-SIMPLE,
+#tab2-PARAM:checked   ~ .panels .tab-panel.p-PARAM,
+#tab2-ACTIVE:checked  ~ .panels .tab-panel.p-ACTIVE {
+    display: block;
+}
+</style>

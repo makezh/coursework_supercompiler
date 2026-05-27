@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — суперкомпилятор SLL{% endblock %}
+{% block body %}
+<header>
+    <h1>{{ title }}</h1>
+    <div class="meta">
+        Точка входа: <b>{{ entry }}</b>
+        &nbsp;|&nbsp; Стратегия: <b>{{ strategy }}/{{ gen_type }}</b>
+        {% if source_label %}&nbsp;|&nbsp; Источник: <b>{{ source_label }}</b>{% endif %}
+    </div>
+</header>
+
+<div class="layout">
+    <section class="panel">
+        <h2>Исходная программа SLL</h2>
+        <pre class="code">{{ src }}</pre>
+    </section>
+
+    <section>
+        {# Радио-кнопки управляют CSS-табами через :checked + sibling селекторы #}
+        <input type="radio" name="tab" id="tab-OFF">
+        <input type="radio" name="tab" id="tab-SIMPLE">
+        <input type="radio" name="tab" id="tab-PARAM">
+        <input type="radio" name="tab" id="tab-ACTIVE" checked>
+
+        <div class="tabs">
+            <label for="tab-OFF">OFF</label>
+            <label for="tab-SIMPLE">SIMPLE</label>
+            <label for="tab-PARAM">PARAM</label>
+            <label for="tab-ACTIVE">ACTIVE</label>
+        </div>
+
+        <div class="panels">
+            {% for level in ["OFF", "SIMPLE", "PARAM", "ACTIVE"] %}
+            {% set r = results[level] %}
+            <div class="tab-panel p-{{ level }}">
+                <div class="panel">
+                    {% if r.error %}
+                        <div class="error">Ошибка на уровне {{ level }}:
+{{ r.error }}</div>
+                    {% else %}
+                        <div class="graph">
+                            {% if r.svg %}{{ r.svg | safe }}
+                            {% else %}<div class="graph-missing">Граф недоступен (нужен <code>graphviz</code> в PATH).</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="stats">
+                            <div class="stat-cell">
+                                <div class="stat-label">функций</div>
+                                <div class="stat-value">{{ r.stats.num_functions }}</div>
+                            </div>
+                            <div class="stat-cell">
+                                <div class="stat-label">правил</div>
+                                <div class="stat-value">{{ r.stats.num_rules }}</div>
+                            </div>
+                            <div class="stat-cell">
+                                <div class="stat-label">макс. арность</div>
+                                <div class="stat-value">{{ r.stats.max_arity }}</div>
+                            </div>
+                            <div class="stat-cell">
+                                <div class="stat-label">арность рекурсии</div>
+                                <div class="stat-value">{{ r.stats.recursion_arity }}</div>
+                            </div>
+                        </div>
+
+                        {% if r.formats %}
+                        <h2>Форматы базисных конфигураций</h2>
+                        <table class="formats">
+                            <thead>
+                                <tr><th>Базис</th><th>Формат</th><th>Параметры</th></tr>
+                            </thead>
+                            <tbody>
+                            {% for f in r.formats %}
+                                <tr class="{% if f.decomposed %}decomposed{% endif %}">
+                                    <td>{{ f.basis_expr }}</td>
+                                    <td>{{ f.format_str }}</td>
+                                    <td>
+                                        {% for p in f.frozen_params %}<span class="tag frozen">#{{ p }}</span>{% endfor %}
+                                        {% for v in f.output_vars %}<span class="tag output">{{ v }}</span>{% endfor %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endif %}
+
+                        <h2>Резидуальная программа</h2>
+                        <pre class="code">{{ r.residual_sll }}</pre>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if effect %}
+        <div class="effect-summary">
+            <h3>Сводка эффекта OFF → ACTIVE</h3>
+            <ul>
+                {% for key, msg in effect.items() %}<li>{{ msg }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

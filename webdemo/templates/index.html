@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Суперкомпилятор SLL — демо{% endblock %}
+{% block body %}
+<header>
+    <h1>Суперкомпилятор SLL — интерактивное демо</h1>
+    <div class="meta">Введи программу и нажми «Прогнать», увидишь резидуал и форматы на 4 уровнях.</div>
+</header>
+
+<div class="layout">
+    <section class="panel">
+        <h2>Параметры</h2>
+        <form id="run-form">
+            <div class="row">
+                <label for="sample-select">Готовый пример</label>
+                <select id="sample-select" name="sample">
+                    <option value="">— выберите —</option>
+                    {% for s in samples %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                </select>
+            </div>
+
+            <div class="row">
+                <label for="entry">Точка входа</label>
+                <input type="text" name="entry" id="entry" value="main">
+            </div>
+
+            <div class="row">
+                <label>Свисток</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="strategy" value="HE" checked><span>HE</span></label>
+                    <label><input type="radio" name="strategy" value="TAG"><span>TAG</span></label>
+                </div>
+            </div>
+
+            <div class="row">
+                <label>Обобщение</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="gen" value="TOP"><span>TOP</span></label>
+                    <label><input type="radio" name="gen" value="BOTTOM" checked><span>BOTTOM</span></label>
+                </div>
+            </div>
+
+            <div class="row">
+                <label for="src">SLL-код</label>
+                <textarea class="code" name="src" id="src" placeholder="type [Nat] : Z | S [Nat] .&#10;fun (main [Nat]) -> [Nat] :&#10;    (main x) -> [S x] ."></textarea>
+            </div>
+
+            <button type="submit" class="primary">Прогнать</button>
+        </form>
+    </section>
+
+    <section class="panel">
+        <h2>Результат</h2>
+        <div id="result"><div class="muted">Выбери пример или введи свой код, потом «Прогнать».</div></div>
+    </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+$("sample-select").addEventListener("change", async ev => {
+    const name = ev.target.value;
+    if (!name) return;
+    const r = await fetch("/sample/" + encodeURIComponent(name));
+    if (r.ok) {
+        $("src").value = await r.text();
+        const stem = name.replace(/\.sll$/, "");
+        const guesses = {format_sum:"main", format_const:"constSZ", format_proj:"idnat",
+                          format_proj_param:"wrapS", format_drop_param:"constY",
+                          format_branchy:"pick", format_append:"main",
+                          active_simple:"main", active_evenAndConst:"main",
+                          active_no_trigger:"main"};
+        if (guesses[stem]) $("entry").value = guesses[stem];
+        else $("entry").value = "main";
+    }
+});
+
+$("run-form").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const btn = ev.target.querySelector("button");
+    btn.disabled = true; btn.textContent = "Считаем...";
+    const fd = new FormData(ev.target);
+    const r = await fetch("/compile", {method: "POST", body: fd});
+    const html = await r.text();
+    $("result").innerHTML = html;
+    btn.disabled = false; btn.textContent = "Прогнать";
+});
+</script>
+{% endblock %}
