@@ -1,0 +1,11 @@
+type [List x] : Cons [x] [List [x]] | Nil  .
+type [Letter] : A  | B  | C  | D  .
+type [Bool] : True  | False  .
+
+
+(g1 [Cons [A] v2] [Cons [A] v4]) -> (g1 v2 v4);
+(g1 [Cons [B] v6] [Cons [B] v8]) -> (g1 v6 v8);
+(g1 [Cons [C] v10] [Cons [C] v12]) -> (g1 v10 v12);
+(g1 [Cons [D] v14] [Cons [D] v16]) -> (g1 v14 v16);
+(g1 [Nil] [Nil]) -> [True];
+(g1 x1 x2) -> [False];

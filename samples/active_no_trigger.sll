@@ -1,0 +1,8 @@
+type [Nat] : Z | S [Nat] .
+
+fun (sum [Nat] [Nat]) -> [Nat] :
+    (sum [Z] y) -> y
+  | (sum [S x] y) -> [S (sum x y)] .
+
+fun (main [Nat]) -> [Nat] :
+    (main a) -> (sum a [S [S [Z]]]) .

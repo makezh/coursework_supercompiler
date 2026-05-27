@@ -1,0 +1,24 @@
+--- Reading samples/test.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (add x1 x2) ---
+--- Supercompiling: (add x1 x2) ---
+    Strategy: HE
+    Generalize type: TOP
+    Context: {'x1': TypeExpr(name='Nat', params=[]), 'x2': TypeExpr(name='Nat', params=[])}
+Running Classical TOP-down Supercompilation...
+[DRIVE] at (add x1 x2)  step=VariantStep
+[DRIVE] at x2  step=StopStep
+[DRIVE] at [S (add v1 x2)]  step=DecomposeStep
+[FOLD] beta=(add v1 x2)  -> alpha=(add x1 x2)
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [Nat] : Z  | S [Nat] .
+
+
+(g1 [Z] x2) -> x2;
+(g1 [S v1] x2) -> [S (g1 v1 x2)];
+========================

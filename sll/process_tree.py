@@ -82,6 +82,7 @@ class Node:
     format_component_root: Optional['Node'] = None
     frozen_params: Set[str] = field(default_factory=set)
     decomposed: bool = False
+    active_decomp: Optional[object] = None
 
     def add_child(self, node: 'Node', contraction: Optional[Contraction] = None):
         node.parent = self

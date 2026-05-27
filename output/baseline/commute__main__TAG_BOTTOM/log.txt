@@ -1,0 +1,143 @@
+--- Reading samples/commute.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (main x1) ---
+--- Supercompiling: (main x1) ---
+    Strategy: TAG
+    Generalize type: BOTTOM
+    Context: {'x1': TypeExpr(name='Nat', params=[])}
+Running Abramov's BOTTOM-up Supercompilation with Hypercycle...
+[DRIVE] at (main x1)  step=TransientStep
+[DRIVE*] at (eq (add x1 [S [Z]]) (add [S [Z]] x1))  step=VariantStep
+[BAG] expr=(eq (add x1 [S [Z]]) (add [S [Z]] x1)) bag=Counter({21: 6, 11: 3, 12: 3, 14: 3, 15: 3, 16: 3, 17: 3, 18: 3}) heap=0 stack=0
+[DRIVE] at (eq (add [S v1] [S [Z]]) (add [S [Z]] [S v1]))  step=TransientStep
+[DRIVE*] at (eq [S (add v1 [S [Z]])] (add [S [Z]] [S v1]))  step=TransientStep
+[BAG] expr=(eq [S (add v1 [S [Z]])] (add [S [Z]] [S v1])) bag=Counter({11: 8, 1: 3, 2: 3, 14: 3, 15: 3, 16: 3, 17: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq [S (add v1 [S [Z]])] [S (add [Z] [S v1])])  step=TransientStep
+[BAG] expr=(eq [S (add v1 [S [Z]])] [S (add [Z] [S v1])]) bag=Counter({11: 8, 1: 6, 2: 6, 14: 3, 15: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq (add v1 [S [Z]]) (add [Z] [S v1]))  step=VariantStep
+[BAG] expr=(eq (add v1 [S [Z]]) (add [Z] [S v1])) bag=Counter({2: 6, 11: 5, 7: 3, 14: 3, 15: 3, 18: 3}) heap=0 stack=1
+[DRIVE] at (eq (add [Z] [S [Z]]) (add [S [Z]] [Z]))  step=TransientStep
+[DRIVE*] at (eq [S [Z]] (add [S [Z]] [Z]))  step=TransientStep
+[BAG] expr=(eq [S [Z]] (add [S [Z]] [Z])) bag=Counter({11: 8, 14: 3, 15: 3, 16: 3, 17: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq [S [Z]] [S (add [Z] [Z])])  step=TransientStep
+[BAG] expr=(eq [S [Z]] [S (add [Z] [Z])]) bag=Counter({11: 8, 14: 3, 15: 3, 1: 3, 2: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq [Z] (add [Z] [Z]))  step=TransientStep
+[BAG] expr=(eq [Z] (add [Z] [Z])) bag=Counter({11: 5, 7: 3, 15: 3, 2: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[BAG] expr=(eq [Z] [Z]) bag=Counter({11: 5, 7: 3, 15: 3}) heap=0 stack=1
+[DRIVE*] at [True]  step=DecomposeStep
+[BAG] expr=[True] bag=Counter({11: 5, 6: 3}) heap=0 stack=1
+[DRIVE] at (eq (add [S v2] [S [Z]]) (add [Z] [S [S v2]]))  step=TransientStep
+[DRIVE*] at (eq [S (add v2 [S [Z]])] (add [Z] [S [S v2]]))  step=TransientStep
+[BAG] expr=(eq [S (add v2 [S [Z]])] (add [Z] [S [S v2]])) bag=Counter({7: 8, 2: 6, 11: 5, 1: 3, 14: 3, 15: 3, 18: 3}) heap=0 stack=2
+[DRIVE*] at (eq [S (add v2 [S [Z]])] [S [S v2]])  step=TransientStep
+[BAG] expr=(eq [S (add v2 [S [Z]])] [S [S v2]]) bag=Counter({7: 8, 11: 5, 1: 3, 2: 3, 14: 3, 15: 3}) heap=0 stack=2
+[DRIVE*] at (eq (add v2 [S [Z]]) [S v2])  step=VariantStep
+[BAG] expr=(eq (add v2 [S [Z]]) [S v2]) bag=Counter({7: 8, 11: 5, 2: 3, 14: 3, 15: 3}) heap=0 stack=2
+[DRIVE] at (eq (add [Z] [S [Z]]) (add [Z] [S [Z]]))  step=TransientStep
+[DRIVE*] at (eq [S [Z]] (add [Z] [S [Z]]))  step=TransientStep
+[BAG] expr=(eq [S [Z]] (add [Z] [S [Z]])) bag=Counter({7: 8, 11: 5, 14: 3, 15: 3, 2: 3, 18: 3}) heap=0 stack=2
+[DRIVE*] at (eq [S [Z]] [S [Z]])  step=TransientStep
+[BAG] expr=(eq [S [Z]] [S [Z]]) bag=Counter({7: 8, 11: 5, 14: 3, 15: 3}) heap=0 stack=2
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[BAG] expr=(eq [Z] [Z]) bag=Counter({7: 8, 11: 5, 15: 3}) heap=0 stack=2
+[DRIVE*] at [True]  step=DecomposeStep
+[BAG] expr=[True] bag=Counter({11: 5, 7: 5, 6: 3}) heap=0 stack=2
+[DRIVE] at (eq (add [S v3] [S [Z]]) [S [S v3]])  step=TransientStep
+[DRIVE*] at (eq [S (add v3 [S [Z]])] [S [S v3]])  step=TransientStep
+[BAG] expr=(eq [S (add v3 [S [Z]])] [S [S v3]]) bag=Counter({7: 13, 11: 5, 1: 3, 2: 3, 14: 3, 15: 3}) heap=0 stack=3
+[DRIVE*] at (eq (add v3 [S [Z]]) [S v3])  step=VariantStep
+[BAG] expr=(eq (add v3 [S [Z]]) [S v3]) bag=Counter({7: 13, 11: 5, 2: 3, 14: 3, 15: 3}) heap=0 stack=3
+[FOLD*] beta=(eq (add v3 [S [Z]]) [S v3])  -> alpha=(eq (add v2 [S [Z]]) [S v2])
+[DRIVE] at (eq (add [Z] [S [Z]]) [S [Z]])  step=TransientStep
+[DRIVE*] at (eq [S [Z]] [S [Z]])  step=TransientStep
+[BAG] expr=(eq [S [Z]] [S [Z]]) bag=Counter({7: 13, 11: 5, 14: 3, 15: 3}) heap=0 stack=3
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[BAG] expr=(eq [Z] [Z]) bag=Counter({7: 13, 11: 5, 15: 3}) heap=0 stack=3
+[DRIVE*] at [True]  step=DecomposeStep
+[BAG] expr=[True] bag=Counter({7: 10, 11: 5, 6: 3}) heap=0 stack=3
+  Hypercycle: processing config (eq (add x1 [S [Z]]) (add [S [Z]] x1))
+[DRIVE] at (eq (add v2 [S [Z]]) [S v2])  step=VariantStep
+[DRIVE] at (eq (add [S v5] [S [Z]]) [S [S v5]])  step=TransientStep
+[DRIVE*] at (eq [S (add v5 [S [Z]])] [S [S v5]])  step=TransientStep
+[BAG] expr=(eq [S (add v5 [S [Z]])] [S [S v5]]) bag=Counter({22: 8, 1: 3, 2: 3, 25: 3, 26: 3, 27: 3}) heap=0 stack=1
+[DRIVE*] at (eq (add v5 [S [Z]]) [S v5])  step=VariantStep
+[BAG] expr=(eq (add v5 [S [Z]]) [S v5]) bag=Counter({22: 5, 7: 3, 2: 3, 25: 3, 26: 3}) heap=0 stack=1
+[FOLD*] beta=(eq (add v5 [S [Z]]) [S v5])  -> alpha=(eq (add v2 [S [Z]]) [S v2])
+[DRIVE] at (eq (add [Z] [S [Z]]) [S [Z]])  step=TransientStep
+[DRIVE*] at (eq [S [Z]] [S [Z]])  step=TransientStep
+[BAG] expr=(eq [S [Z]] [S [Z]]) bag=Counter({22: 8, 25: 3, 26: 3, 27: 3}) heap=0 stack=1
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[BAG] expr=(eq [Z] [Z]) bag=Counter({22: 5, 7: 3, 26: 3}) heap=0 stack=1
+[DRIVE*] at [True]  step=DecomposeStep
+[BAG] expr=[True] bag=Counter({22: 5, 6: 3}) heap=0 stack=1
+  Hypercycle: processing config (eq (add v2 [S [Z]]) [S v2])
+[DRIVE] at (main x1)  step=TransientStep
+[DRIVE*] at (eq (add x1 [S [Z]]) (add [S [Z]] x1))  step=VariantStep
+[BAG] expr=(eq (add x1 [S [Z]]) (add [S [Z]] x1)) bag=Counter({30: 6, 11: 3, 12: 3, 14: 3, 15: 3, 16: 3, 17: 3, 18: 3}) heap=0 stack=0
+[DRIVE] at (eq (add [S v7] [S [Z]]) (add [S [Z]] [S v7]))  step=TransientStep
+[DRIVE*] at (eq [S (add v7 [S [Z]])] (add [S [Z]] [S v7]))  step=TransientStep
+[BAG] expr=(eq [S (add v7 [S [Z]])] (add [S [Z]] [S v7])) bag=Counter({11: 8, 1: 3, 2: 3, 14: 3, 15: 3, 16: 3, 17: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq [S (add v7 [S [Z]])] [S (add [Z] [S v7])])  step=TransientStep
+[BAG] expr=(eq [S (add v7 [S [Z]])] [S (add [Z] [S v7])]) bag=Counter({11: 8, 1: 6, 2: 6, 14: 3, 15: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq (add v7 [S [Z]]) (add [Z] [S v7]))  step=VariantStep
+[BAG] expr=(eq (add v7 [S [Z]]) (add [Z] [S v7])) bag=Counter({2: 6, 11: 5, 7: 3, 14: 3, 15: 3, 18: 3}) heap=0 stack=1
+[DRIVE] at (eq (add [Z] [S [Z]]) (add [S [Z]] [Z]))  step=TransientStep
+[DRIVE*] at (eq [S [Z]] (add [S [Z]] [Z]))  step=TransientStep
+[BAG] expr=(eq [S [Z]] (add [S [Z]] [Z])) bag=Counter({11: 8, 14: 3, 15: 3, 16: 3, 17: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq [S [Z]] [S (add [Z] [Z])])  step=TransientStep
+[BAG] expr=(eq [S [Z]] [S (add [Z] [Z])]) bag=Counter({11: 8, 14: 3, 15: 3, 1: 3, 2: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq [Z] (add [Z] [Z]))  step=TransientStep
+[BAG] expr=(eq [Z] (add [Z] [Z])) bag=Counter({11: 5, 7: 3, 15: 3, 2: 3, 18: 3}) heap=0 stack=1
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[BAG] expr=(eq [Z] [Z]) bag=Counter({11: 5, 7: 3, 15: 3}) heap=0 stack=1
+[DRIVE*] at [True]  step=DecomposeStep
+[BAG] expr=[True] bag=Counter({11: 5, 6: 3}) heap=0 stack=1
+[DRIVE] at (eq (add [S v8] [S [Z]]) (add [Z] [S [S v8]]))  step=TransientStep
+[DRIVE*] at (eq [S (add v8 [S [Z]])] (add [Z] [S [S v8]]))  step=TransientStep
+[BAG] expr=(eq [S (add v8 [S [Z]])] (add [Z] [S [S v8]])) bag=Counter({7: 8, 2: 6, 11: 5, 1: 3, 14: 3, 15: 3, 18: 3}) heap=0 stack=2
+[DRIVE*] at (eq [S (add v8 [S [Z]])] [S [S v8]])  step=TransientStep
+[BAG] expr=(eq [S (add v8 [S [Z]])] [S [S v8]]) bag=Counter({7: 8, 11: 5, 1: 3, 2: 3, 14: 3, 15: 3}) heap=0 stack=2
+[DRIVE*] at (eq (add v8 [S [Z]]) [S v8])  step=VariantStep
+[BAG] expr=(eq (add v8 [S [Z]]) [S v8]) bag=Counter({7: 8, 11: 5, 2: 3, 14: 3, 15: 3}) heap=0 stack=2
+[DRIVE] at (eq (add [Z] [S [Z]]) (add [Z] [S [Z]]))  step=TransientStep
+[DRIVE*] at (eq [S [Z]] (add [Z] [S [Z]]))  step=TransientStep
+[BAG] expr=(eq [S [Z]] (add [Z] [S [Z]])) bag=Counter({7: 8, 11: 5, 14: 3, 15: 3, 2: 3, 18: 3}) heap=0 stack=2
+[DRIVE*] at (eq [S [Z]] [S [Z]])  step=TransientStep
+[BAG] expr=(eq [S [Z]] [S [Z]]) bag=Counter({7: 8, 11: 5, 14: 3, 15: 3}) heap=0 stack=2
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[BAG] expr=(eq [Z] [Z]) bag=Counter({7: 8, 11: 5, 15: 3}) heap=0 stack=2
+[DRIVE*] at [True]  step=DecomposeStep
+[BAG] expr=[True] bag=Counter({11: 5, 7: 5, 6: 3}) heap=0 stack=2
+[DRIVE] at (eq (add [S v9] [S [Z]]) [S [S v9]])  step=TransientStep
+[DRIVE*] at (eq [S (add v9 [S [Z]])] [S [S v9]])  step=TransientStep
+[BAG] expr=(eq [S (add v9 [S [Z]])] [S [S v9]]) bag=Counter({7: 13, 11: 5, 1: 3, 2: 3, 14: 3, 15: 3}) heap=0 stack=3
+[DRIVE*] at (eq (add v9 [S [Z]]) [S v9])  step=VariantStep
+[BAG] expr=(eq (add v9 [S [Z]]) [S v9]) bag=Counter({7: 13, 11: 5, 2: 3, 14: 3, 15: 3}) heap=0 stack=3
+[FOLD*] beta=(eq (add v9 [S [Z]]) [S v9])  -> alpha=(eq (add v8 [S [Z]]) [S v8])
+[DRIVE] at (eq (add [Z] [S [Z]]) [S [Z]])  step=TransientStep
+[DRIVE*] at (eq [S [Z]] [S [Z]])  step=TransientStep
+[BAG] expr=(eq [S [Z]] [S [Z]]) bag=Counter({7: 13, 11: 5, 14: 3, 15: 3}) heap=0 stack=3
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[BAG] expr=(eq [Z] [Z]) bag=Counter({7: 13, 11: 5, 15: 3}) heap=0 stack=3
+[DRIVE*] at [True]  step=DecomposeStep
+[BAG] expr=[True] bag=Counter({7: 10, 11: 5, 6: 3}) heap=0 stack=3
+--- Pruning Forest ---
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [Nat] : Z  | S [Nat] .
+type [Bool] : True  | False  .
+
+
+(main x1) -> (g1 x1);
+(g1 [S v1]) -> (g2 v1);
+(g1 [Z]) -> [True];
+(g2 [S v2]) -> (g3 v2);
+(g2 [Z]) -> [True];
+(g3 [S v5]) -> (g3 v5);
+(g3 [Z]) -> [True];
+========================

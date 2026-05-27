@@ -1,0 +1,124 @@
+--- Reading samples/test_4.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (fabc x1) ---
+--- Supercompiling: (fabc x1) ---
+    Strategy: HE
+    Generalize type: BOTTOM
+    Context: {'x1': TypeExpr(name='List', params=[TypeExpr(name='Letter', params=[])])}
+Running Abramov's BOTTOM-up Supercompilation with Hypercycle...
+[DRIVE] at (fabc x1)  step=TransientStep
+[DRIVE*] at (fbc (fab x1))  step=VariantStep
+[DRIVE] at (fbc (fab [Cons [A] v2]))  step=TransientStep
+[DRIVE*] at (fbc [Cons [B] (fab v2)])  step=TransientStep
+[DRIVE*] at [Cons [C] (fbc (fab v2))]  step=DecomposeStep
+[DRIVE] at (fbc (fab [Cons v3 v4]))  step=VariantStep
+[WHISTLE] alpha=(fbc (fab x1))  beta=(fbc (fab [Cons v3 v4]))  strategy=HE
+[GEN] alpha=(fbc (fab x1))  beta=(fbc (fab [Cons v3 v4])) gen_type=BOTTOM
+[DRIVE] at (fbc (fab [Nil]))  step=TransientStep
+[DRIVE*] at (fbc [Nil])  step=TransientStep
+[DRIVE*] at [Nil]  step=DecomposeStep
+[DRIVE] at [C]  step=DecomposeStep
+[FOLD] beta=(fbc (fab v2))  -> alpha=(fbc (fab x1))
+[DRIVE] at (fbc (fab [Cons [A] v4]))  step=TransientStep
+[DRIVE*] at (fbc [Cons [B] (fab v4)])  step=TransientStep
+[DRIVE*] at [Cons [C] (fbc (fab v4))]  step=DecomposeStep
+[DRIVE] at (fbc [Cons v3 (fab v4)])  step=VariantStep
+[WHISTLE] alpha=(fbc (fab x1))  beta=(fbc [Cons v3 (fab v4)])  strategy=HE
+[GEN] alpha=(fbc (fab x1))  beta=(fbc [Cons v3 (fab v4)]) gen_type=BOTTOM
+[DRIVE] LET matched
+[DRIVE] at (let v1 = [Cons v3 (fab v4)] in (fbc v1))  step=DecomposeStep
+[DRIVE] at [C]  step=DecomposeStep
+[FOLD] beta=(fbc (fab v4))  -> alpha=(fbc (fab x1))
+[DRIVE] at [Cons v3 (fab v4)]  step=DecomposeStep
+[DRIVE] at (fbc v1)  step=StopStep
+[DRIVE] at v3  step=StopStep
+[DRIVE] at (fab v4)  step=VariantStep
+[DRIVE] at [Cons [B] (fab v6)]  step=DecomposeStep
+[FOLD] beta=[Cons v7 (fab v8)]  -> alpha=[Cons v3 (fab v4)]
+[DRIVE] at [Nil]  step=DecomposeStep
+[DRIVE] at [B]  step=DecomposeStep
+[FOLD] beta=(fab v6)  -> alpha=(fab v4)
+  Hypercycle: processing config (fbc (fab x1))
+[DRIVE] at [Cons v3 (fab v4)]  step=DecomposeStep
+[DRIVE] at v3  step=StopStep
+[DRIVE] at (fab v4)  step=VariantStep
+[DRIVE] at [Cons [B] (fab v10)]  step=DecomposeStep
+[FOLD] beta=[Cons v11 (fab v12)]  -> alpha=[Cons v3 (fab v4)]
+[DRIVE] at [Nil]  step=DecomposeStep
+[DRIVE] at [B]  step=DecomposeStep
+[FOLD] beta=(fab v10)  -> alpha=(fab v4)
+  Hypercycle: processing config [Cons v3 (fab v4)]
+[DRIVE] at (fab v4)  step=VariantStep
+[DRIVE] at [Cons [B] (fab v14)]  step=DecomposeStep
+[DRIVE] at [Cons v15 (fab v16)]  step=DecomposeStep
+[DRIVE] at [Nil]  step=DecomposeStep
+[DRIVE] at [B]  step=DecomposeStep
+[FOLD] beta=(fab v14)  -> alpha=(fab v4)
+[DRIVE] at v15  step=StopStep
+[FOLD] beta=(fab v16)  -> alpha=(fab v4)
+  Hypercycle: processing config (fab v4)
+[DRIVE] at (fab v4)  step=VariantStep
+[DRIVE] at [Cons [B] (fab v18)]  step=DecomposeStep
+[DRIVE] at [Cons v19 (fab v20)]  step=DecomposeStep
+[DRIVE] at [Nil]  step=DecomposeStep
+[DRIVE] at [B]  step=DecomposeStep
+[FOLD] beta=(fab v18)  -> alpha=(fab v4)
+[DRIVE] at v19  step=StopStep
+[FOLD] beta=(fab v20)  -> alpha=(fab v4)
+[DRIVE] at (fabc x1)  step=TransientStep
+[DRIVE*] at (fbc (fab x1))  step=VariantStep
+[DRIVE] at (fbc (fab [Cons [A] v22]))  step=TransientStep
+[DRIVE*] at (fbc [Cons [B] (fab v22)])  step=TransientStep
+[DRIVE*] at [Cons [C] (fbc (fab v22))]  step=DecomposeStep
+[DRIVE] at (fbc (fab [Cons v23 v24]))  step=VariantStep
+[WHISTLE] alpha=(fbc (fab x1))  beta=(fbc (fab [Cons v23 v24]))  strategy=HE
+[GEN] alpha=(fbc (fab x1))  beta=(fbc (fab [Cons v23 v24])) gen_type=BOTTOM
+[DRIVE] at (fbc (fab [Nil]))  step=TransientStep
+[DRIVE*] at (fbc [Nil])  step=TransientStep
+[DRIVE*] at [Nil]  step=DecomposeStep
+[DRIVE] at [C]  step=DecomposeStep
+[FOLD] beta=(fbc (fab v22))  -> alpha=(fbc (fab x1))
+[DRIVE] at (fbc (fab [Cons [A] v24]))  step=TransientStep
+[DRIVE*] at (fbc [Cons [B] (fab v24)])  step=TransientStep
+[DRIVE*] at [Cons [C] (fbc (fab v24))]  step=DecomposeStep
+[DRIVE] at (fbc [Cons v23 (fab v24)])  step=VariantStep
+[WHISTLE] alpha=(fbc (fab x1))  beta=(fbc [Cons v23 (fab v24)])  strategy=HE
+[GEN] alpha=(fbc (fab x1))  beta=(fbc [Cons v23 (fab v24)]) gen_type=BOTTOM
+[DRIVE] LET matched
+[DRIVE] at (let v1 = [Cons v23 (fab v24)] in (fbc v1))  step=DecomposeStep
+[DRIVE] at [C]  step=DecomposeStep
+[FOLD] beta=(fbc (fab v24))  -> alpha=(fbc (fab x1))
+[DRIVE] at [Cons v23 (fab v24)]  step=DecomposeStep
+[DRIVE] at (fbc v1)  step=StopStep
+[DRIVE] at v23  step=StopStep
+[DRIVE] at (fab v24)  step=VariantStep
+[DRIVE] at [Cons [B] (fab v26)]  step=DecomposeStep
+[FOLD] beta=[Cons v27 (fab v28)]  -> alpha=[Cons v23 (fab v24)]
+[DRIVE] at [Nil]  step=DecomposeStep
+[DRIVE] at [B]  step=DecomposeStep
+[FOLD] beta=(fab v26)  -> alpha=(fab v24)
+--- Pruning Forest ---
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [List x] : Cons [x] [List [x]] | Nil  .
+type [Letter] : A  | B  | C  | D  .
+
+
+(main x1) -> (g1 x1);
+(g1 [Cons [A] v2]) -> [Cons [C] (g1 v2)];
+(g1 [Cons v3 v4]) -> (g2 v3 v4);
+(g1 [Nil]) -> [Nil];
+(g2 [A] v4) -> [Cons [C] (g1 v4)];
+(k1 v1) -> (fbc v1);
+(g2 v3 v4) -> (k1 [Cons v3 (g3 v4)]);
+(g3 [Cons [A] v14]) -> [Cons [B] (g3 v14)];
+(g3 [Cons v15 v16]) -> [Cons v15 (g3 v16)];
+(g3 [Nil]) -> [Nil];
+(fbc [Cons [B] xs]) -> [Cons [C] (fbc xs)];
+(fbc [Cons x xs]) -> [Cons x (fbc xs)];
+(fbc [Nil]) -> [Nil];
+========================

@@ -1,0 +1,6 @@
+type [Nat] : Z  | S [Nat] .
+type [Bool] : True  | False  .
+
+
+(g1 [Z] x2) -> x2;
+(g1 [S v1] x2) -> [S (g1 v1 x2)];

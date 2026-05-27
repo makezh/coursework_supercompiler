@@ -1,0 +1,11 @@
+type [Nat] : Z  | S [Nat] .
+type [Bool] : True  | False  .
+
+
+(main x1) -> (g1 x1);
+(g1 [S v1]) -> (g2 v1);
+(g1 [Z]) -> [True];
+(g2 [S v2]) -> (g3 v2);
+(g2 [Z]) -> [True];
+(g3 [S v5]) -> (g3 v5);
+(g3 [Z]) -> [True];

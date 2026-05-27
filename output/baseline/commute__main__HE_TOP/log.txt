@@ -1,0 +1,54 @@
+--- Reading samples/commute.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (main x1) ---
+--- Supercompiling: (main x1) ---
+    Strategy: HE
+    Generalize type: TOP
+    Context: {'x1': TypeExpr(name='Nat', params=[])}
+Running Classical TOP-down Supercompilation...
+[DRIVE] at (main x1)  step=TransientStep
+[DRIVE*] at (eq (add x1 [S [Z]]) (add [S [Z]] x1))  step=VariantStep
+[DRIVE] at (eq (add [S v1] [S [Z]]) (add [S [Z]] [S v1]))  step=TransientStep
+[DRIVE*] at (eq [S (add v1 [S [Z]])] (add [S [Z]] [S v1]))  step=TransientStep
+[DRIVE*] at (eq [S (add v1 [S [Z]])] [S (add [Z] [S v1])])  step=TransientStep
+[DRIVE*] at (eq (add v1 [S [Z]]) (add [Z] [S v1]))  step=VariantStep
+[DRIVE] at (eq (add [Z] [S [Z]]) (add [S [Z]] [Z]))  step=TransientStep
+[DRIVE*] at (eq [S [Z]] (add [S [Z]] [Z]))  step=TransientStep
+[DRIVE*] at (eq [S [Z]] [S (add [Z] [Z])])  step=TransientStep
+[DRIVE*] at (eq [Z] (add [Z] [Z]))  step=TransientStep
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[DRIVE*] at [True]  step=DecomposeStep
+[DRIVE] at (eq (add [S v2] [S [Z]]) (add [Z] [S [S v2]]))  step=TransientStep
+[DRIVE*] at (eq [S (add v2 [S [Z]])] (add [Z] [S [S v2]]))  step=TransientStep
+[DRIVE*] at (eq [S (add v2 [S [Z]])] [S [S v2]])  step=TransientStep
+[DRIVE*] at (eq (add v2 [S [Z]]) [S v2])  step=VariantStep
+[DRIVE] at (eq (add [Z] [S [Z]]) (add [Z] [S [Z]]))  step=TransientStep
+[DRIVE*] at (eq [S [Z]] (add [Z] [S [Z]]))  step=TransientStep
+[DRIVE*] at (eq [S [Z]] [S [Z]])  step=TransientStep
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[DRIVE*] at [True]  step=DecomposeStep
+[DRIVE] at (eq (add [S v3] [S [Z]]) [S [S v3]])  step=TransientStep
+[DRIVE*] at (eq [S (add v3 [S [Z]])] [S [S v3]])  step=TransientStep
+[DRIVE*] at (eq (add v3 [S [Z]]) [S v3])  step=VariantStep
+[FOLD*] beta=(eq (add v3 [S [Z]]) [S v3])  -> alpha=(eq (add v2 [S [Z]]) [S v2])
+[DRIVE] at (eq (add [Z] [S [Z]]) [S [Z]])  step=TransientStep
+[DRIVE*] at (eq [S [Z]] [S [Z]])  step=TransientStep
+[DRIVE*] at (eq [Z] [Z])  step=TransientStep
+[DRIVE*] at [True]  step=DecomposeStep
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [Nat] : Z  | S [Nat] .
+type [Bool] : True  | False  .
+
+
+(g1 [S v1]) -> (g2 v1);
+(g1 [Z]) -> [True];
+(g2 [S v2]) -> (g3 v2);
+(g2 [Z]) -> [True];
+(g3 [S v3]) -> (g3 v3);
+(g3 [Z]) -> [True];
+========================

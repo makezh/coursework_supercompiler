@@ -1,0 +1,11 @@
+type [List x] : Cons [x] [List [x]] | Nil  .
+type [Letter] : A  | B  | C  | D  .
+
+
+(f1 x1) -> (g1 (g2 x1));
+(g1 [Cons [B] v6]) -> [Cons [C] (g1 v6)];
+(g1 [Cons v7 v8]) -> [Cons v7 (g1 v8)];
+(g1 [Nil]) -> [Nil];
+(g2 [Cons [A] v10]) -> [Cons [B] (g2 v10)];
+(g2 [Cons v11 v12]) -> [Cons v11 (g2 v12)];
+(g2 [Nil]) -> [Nil];

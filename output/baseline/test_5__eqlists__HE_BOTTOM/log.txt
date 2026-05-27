@@ -1,0 +1,36 @@
+--- Reading samples/test_5.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (eqlists x1 x2) ---
+--- Supercompiling: (eqlists x1 x2) ---
+    Strategy: HE
+    Generalize type: BOTTOM
+    Context: {'x1': TypeExpr(name='List', params=[TypeExpr(name='Letter', params=[])]), 'x2': TypeExpr(name='List', params=[TypeExpr(name='Letter', params=[])])}
+Running Abramov's BOTTOM-up Supercompilation with Hypercycle...
+[DRIVE] at (eqlists x1 x2)  step=VariantStep
+[FOLD] beta=(eqlists v2 v4)  -> alpha=(eqlists x1 x2)
+[FOLD] beta=(eqlists v6 v8)  -> alpha=(eqlists x1 x2)
+[FOLD] beta=(eqlists v10 v12)  -> alpha=(eqlists x1 x2)
+[FOLD] beta=(eqlists v14 v16)  -> alpha=(eqlists x1 x2)
+[DRIVE] at [True]  step=DecomposeStep
+[DRIVE] at [False]  step=DecomposeStep
+  Hypercycle: processing config (eqlists x1 x2)
+--- Pruning Forest ---
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [List x] : Cons [x] [List [x]] | Nil  .
+type [Letter] : A  | B  | C  | D  .
+type [Bool] : True  | False  .
+
+
+(main x1 x2) -> (g1 x1 x2);
+(g1 [Cons [A] v2] [Cons [A] v4]) -> (g1 v2 v4);
+(g1 [Cons [B] v6] [Cons [B] v8]) -> (g1 v6 v8);
+(g1 [Cons [C] v10] [Cons [C] v12]) -> (g1 v10 v12);
+(g1 [Cons [D] v14] [Cons [D] v16]) -> (g1 v14 v16);
+(g1 [Nil] [Nil]) -> [True];
+(g1 x1 x2) -> [False];
+========================

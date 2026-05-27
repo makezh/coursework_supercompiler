@@ -1,0 +1,38 @@
+--- Reading samples/test_3.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (add3 x1 x2 x3) ---
+--- Supercompiling: (add3 x1 x2 x3) ---
+    Strategy: TAG
+    Generalize type: TOP
+    Context: {'x1': TypeExpr(name='Nat', params=[]), 'x2': TypeExpr(name='Nat', params=[]), 'x3': TypeExpr(name='Nat', params=[])}
+Running Classical TOP-down Supercompilation...
+[DRIVE] at (add3 x1 x2 x3)  step=TransientStep
+[DRIVE*] at (add (add x1 x2) x3)  step=VariantStep
+[BAG] expr=(add (add x1 x2) x3) bag=Counter({23: 3, 24: 3, 44: 3, 45: 3, 46: 3}) heap=0 stack=0
+[DRIVE] at (add (add [Z] x2) x3)  step=TransientStep
+[DRIVE*] at (add x2 x3)  step=VariantStep
+[BAG] expr=(add x2 x3) bag=Counter({23: 8, 46: 3}) heap=0 stack=1
+[DRIVE] at (add (add [S v1] x2) x3)  step=TransientStep
+[DRIVE*] at (add [S (add v1 x2)] x3)  step=TransientStep
+[BAG] expr=(add [S (add v1 x2)] x3) bag=Counter({23: 8, 2: 3, 3: 3, 46: 3}) heap=0 stack=1
+[DRIVE*] at [S (add (add v1 x2) x3)]  step=DecomposeStep
+[BAG] expr=[S (add (add v1 x2) x3)] bag=Counter({3: 6, 23: 5, 2: 3, 46: 3}) heap=0 stack=1
+[DRIVE] at x3  step=StopStep
+[DRIVE] at [S (add v2 x3)]  step=DecomposeStep
+[FOLD] beta=(add (add v1 x2) x3)  -> alpha=(add (add x1 x2) x3)
+[FOLD] beta=(add v2 x3)  -> alpha=(add x2 x3)
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [Nat] : Z  | S [Nat] .
+type [Bool] : True  | False  .
+
+
+(g1 [Z] x2 x3) -> (g2 x2 x3);
+(g1 [S v1] x2 x3) -> [S (g1 v1 x2 x3)];
+(g2 [Z] x3) -> x3;
+(g2 [S v2] x3) -> [S (g2 v2 x3)];
+========================

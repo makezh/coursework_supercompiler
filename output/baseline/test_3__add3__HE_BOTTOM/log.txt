@@ -1,0 +1,53 @@
+--- Reading samples/test_3.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (add3 x1 x2 x3) ---
+--- Supercompiling: (add3 x1 x2 x3) ---
+    Strategy: HE
+    Generalize type: BOTTOM
+    Context: {'x1': TypeExpr(name='Nat', params=[]), 'x2': TypeExpr(name='Nat', params=[]), 'x3': TypeExpr(name='Nat', params=[])}
+Running Abramov's BOTTOM-up Supercompilation with Hypercycle...
+[DRIVE] at (add3 x1 x2 x3)  step=TransientStep
+[DRIVE*] at (add (add x1 x2) x3)  step=VariantStep
+[DRIVE] at (add (add [Z] x2) x3)  step=TransientStep
+[DRIVE*] at (add x2 x3)  step=VariantStep
+[DRIVE] at (add (add [S v1] x2) x3)  step=TransientStep
+[DRIVE*] at (add [S (add v1 x2)] x3)  step=TransientStep
+[DRIVE*] at [S (add (add v1 x2) x3)]  step=DecomposeStep
+[DRIVE] at x3  step=StopStep
+[DRIVE] at [S (add v2 x3)]  step=DecomposeStep
+[FOLD] beta=(add (add v1 x2) x3)  -> alpha=(add (add x1 x2) x3)
+[FOLD] beta=(add v2 x3)  -> alpha=(add x2 x3)
+  Hypercycle: processing config (add (add x1 x2) x3)
+[DRIVE] at (add x2 x3)  step=VariantStep
+[DRIVE] at x3  step=StopStep
+[DRIVE] at [S (add v3 x3)]  step=DecomposeStep
+[FOLD] beta=(add v3 x3)  -> alpha=(add x2 x3)
+  Hypercycle: processing config (add x2 x3)
+[DRIVE] at (add3 x1 x2 x3)  step=TransientStep
+[DRIVE*] at (add (add x1 x2) x3)  step=VariantStep
+[DRIVE] at (add (add [Z] x2) x3)  step=TransientStep
+[DRIVE*] at (add x2 x3)  step=VariantStep
+[DRIVE] at (add (add [S v4] x2) x3)  step=TransientStep
+[DRIVE*] at (add [S (add v4 x2)] x3)  step=TransientStep
+[DRIVE*] at [S (add (add v4 x2) x3)]  step=DecomposeStep
+[DRIVE] at x3  step=StopStep
+[DRIVE] at [S (add v5 x3)]  step=DecomposeStep
+[FOLD] beta=(add (add v4 x2) x3)  -> alpha=(add (add x1 x2) x3)
+[FOLD] beta=(add v5 x3)  -> alpha=(add x2 x3)
+--- Pruning Forest ---
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [Nat] : Z  | S [Nat] .
+type [Bool] : True  | False  .
+
+
+(main x1 x2 x3) -> (g1 x1 x2 x3);
+(g1 [Z] x2 x3) -> (g2 x2 x3);
+(g1 [S v1] x2 x3) -> [S (g1 v1 x2 x3)];
+(g2 [Z] x3) -> x3;
+(g2 [S v3] x3) -> [S (g2 v3 x3)];
+========================

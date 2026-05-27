@@ -10,6 +10,25 @@ from sll.preprocessor import add_tags, Tagger
 from sll.bag_of_tags import TagBag
 from sll.tagging import TagAllocator
 from sll.output_format import BOTTOM as FMT_BOTTOM, gen_format, match_value, _collect_vars
+from sll.active_format import should_activate, build_rules
+
+
+def _basis_reaches(src: Node, dst: Node) -> bool:
+    """True если из src по дереву (через basis_ref / back_link на dst) достижим dst."""
+    seen = set()
+    stack = [src]
+    while stack:
+        n = stack.pop()
+        if id(n) in seen:
+            continue
+        seen.add(id(n))
+        if n.is_basis_ref and _is_renaming(n.expr, dst.expr) and n is not dst:
+            return True
+        if n.back_link is dst and n is not dst:
+            return True
+        for c in n.children:
+            stack.append(c)
+    return False
 
 
 def _find_renaming_ancestor(node: Node) -> Node | None:
@@ -136,8 +155,11 @@ class Supercompiler:
 
             self._drive_node_with_step(beta, step, unprocessed)
 
-        if self.format_level in ("SIMPLE", "PARAM", "ACTIVE") and not self.hypercycle_roots:
+        if self.format_level in ("SIMPLE", "PARAM", "ACTIVE") and not self.hypercycle_roots \
+                and not getattr(self, "_inside_hypercycle", False):
             self.build_simple_formats()
+            if self.format_level == "ACTIVE":
+                self.apply_active_formats()
 
     def _create_node(self, expr: Expr, var_types: Dict[str, TypeExpr]) -> Node:
         """Создает узел и сразу считает мешок тегов, если нужно."""
@@ -388,6 +410,7 @@ class Supercompiler:
         Ключевой момент: конфигурации идентифицируются по КАНОНИЧЕСКОМУ корню
         (после нормализации/прогонки внутри build_tree).
         """
+        self._inside_hypercycle = True
 
         processed_configs: dict[str, Node] = {}
 
@@ -450,6 +473,8 @@ class Supercompiler:
 
         if self.format_level in ("SIMPLE", "PARAM", "ACTIVE"):
             self.build_simple_formats()
+        if self.format_level == "ACTIVE":
+            self.apply_active_formats()
 
     def _prune_forest(self):
         """
@@ -485,6 +510,31 @@ class Supercompiler:
 
         collect(root)
         return list(targets)
+
+    def apply_active_formats(self):
+        if self.hypercycle_roots:
+            bases = list(self.hypercycle_roots.values())
+        else:
+            bases = [self.tree]
+
+        def has_decomposed_predecessor(b: Node) -> bool:
+            for other in bases:
+                if other is b or not other.decomposed:
+                    continue
+                if _basis_reaches(other, b):
+                    return True
+            return False
+
+        counter = 0
+        for b in bases:
+            if not should_activate(b.output_format,
+                                    has_decomposed_predecessor(b)):
+                continue
+            counter += 1
+            decomp = build_rules(b.output_format,
+                                  f"fmt_{counter}", f"unfmt_{counter}")
+            b.decomposed = True
+            b.active_decomp = decomp
 
     def build_simple_formats(self):
         if self.hypercycle_roots:

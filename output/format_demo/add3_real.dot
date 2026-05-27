@@ -1,0 +1,30 @@
+digraph ProcessTree {
+  label="Expression: add3\nWhistle Strategy: HE | Gen Type: BOTTOM";
+  labelloc="t";
+  fontsize=20;
+  fontname="Arial";
+
+    node [fontname="Courier New"];
+    edge [fontname="Courier New"];
+    start [label="(add3 x1 x2 x3)", shape=box, style="filled", fillcolor="lightgreen", color="darkgreen", penwidth=2.0];
+    start -> n0 [];
+    n0 [label="(PROGRAM_FOREST )", shape=box];
+    n0 -> n1 [label=""];
+    n0 -> n2 [label=""];
+    n1 [label="(add (add x1 x2) x3)\nfmt: x3", shape=box];
+    n1 -> n3 [label="x1 -> [Z]"];
+    n1 -> n4 [label="x1 -> [S v1]"];
+    n2 [label="(add x2 x3)\nfmt: x3", shape=box];
+    n2 -> n5 [label="x2 -> [Z]"];
+    n2 -> n6 [label="x2 -> [S v3]"];
+    n3 [label="(add x2 x3)", shape=box, style="filled", fillcolor="lightcyan", color="blue", penwidth=2.0];
+    n4 [label="[S (add (add v1 x2) x3)]", shape=box];
+    n4 -> n7 [label=""];
+    n5 [label="x3", shape=box];
+    n6 [label="[S (add v3 x3)]", shape=box];
+    n6 -> n8 [label=""];
+    n7 [label="(add (add v1 x2) x3)", shape=box];
+    n7 -> n1 [style=dashed, color=red, label="Folding"];
+    n8 [label="(add v3 x3)", shape=box];
+    n8 -> n2 [style=dashed, color=red, label="Folding"];
+}

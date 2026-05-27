@@ -1,0 +1,10 @@
+type [Nat] : Z | S [Nat] .
+type [List a] : Cons a [List a] | Nil .
+
+fun (square [Nat]) -> [Nat] :
+    (square [Z]) -> [Z]
+  | (square [S x]) -> [S [S (square x)]] .
+
+fun (evenAndSquare [Nat] [Nat]) -> [List [Nat]] :
+    (evenAndSquare [S [S x]] y) -> (evenAndSquare x y)
+  | (evenAndSquare x y) -> [Cons x [Cons (square y) [Nil]]] .

@@ -1,0 +1,29 @@
+digraph ProcessTree {
+  label="Expression: main\nWhistle Strategy: HE | Gen Type: BOTTOM";
+  labelloc="t";
+  fontsize=20;
+  fontname="Arial";
+
+    node [fontname="Courier New"];
+    edge [fontname="Courier New"];
+    start [label="(main x1 x2 x3 x4)", shape=box, style="filled", fillcolor="lightgreen", color="darkgreen", penwidth=2.0];
+    start -> n0 [];
+    n0 [label="(PROGRAM_FOREST )", shape=box];
+    n0 -> n1 [label=""];
+    n0 -> n2 [label=""];
+    n1 [label="[Cons x1 (append [Cons x2 x3] x4)]\nfmt: [Cons x1 [Cons x2 x4]]", shape=box];
+    n1 -> n3 [label=""];
+    n1 -> n4 [label=""];
+    n2 [label="[Cons x2 (append x3 x4)]\nfmt: [Cons x2 x4]", shape=box];
+    n2 -> n5 [label=""];
+    n2 -> n6 [label=""];
+    n3 [label="x1", shape=box];
+    n4 [label="[Cons x2 (append x3 x4)]", shape=box, style="filled", fillcolor="lightcyan", color="blue", penwidth=2.0];
+    n5 [label="x2", shape=box];
+    n6 [label="(append x3 x4)", shape=box];
+    n6 -> n7 [label="x3 -> [Cons v3 v4]"];
+    n6 -> n8 [label="x3 -> [Nil]"];
+    n7 [label="[Cons v3 (append v4 x4)]", shape=box];
+    n7 -> n2 [style=dashed, color=red, label="Folding"];
+    n8 [label="x4", shape=box];
+}

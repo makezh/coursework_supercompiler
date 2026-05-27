@@ -1,0 +1,28 @@
+--- Reading samples/test_2.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (add x1 x2) ---
+--- Supercompiling: (add x1 x2) ---
+    Strategy: TAG
+    Generalize type: BOTTOM
+    Context: {'x1': TypeExpr(name='Nat', params=[]), 'x2': TypeExpr(name='Nat', params=[])}
+Running Abramov's BOTTOM-up Supercompilation with Hypercycle...
+[DRIVE] at (add x1 x2)  step=VariantStep
+[DRIVE] at x2  step=StopStep
+[DRIVE] at [S (add v1 x2)]  step=DecomposeStep
+[FOLD] beta=(add v1 x2)  -> alpha=(add x1 x2)
+  Hypercycle: processing config (add x1 x2)
+--- Pruning Forest ---
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [Nat] : Z  | S [Nat] .
+type [Bool] : True  | False  .
+
+
+(main x1 x2) -> (g1 x1 x2);
+(g1 [Z] x2) -> x2;
+(g1 [S v1] x2) -> [S (g1 v1 x2)];
+========================

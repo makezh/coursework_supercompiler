@@ -98,10 +98,25 @@ class Residualizer:
 
             entry_name = "main"
             start_sig_name, start_params = self.node_to_sig[start_root]
+
+            for r in roots:
+                decomp = getattr(r, "active_decomp", None)
+                if decomp is not None:
+                    self.rules.append(decomp.fmt_rule)
+                    self.rules.append(decomp.unfmt_rule)
+
+            start_decomp = getattr(start_root, "active_decomp", None)
+            if start_decomp is not None:
+                orig_call = FCall(start_sig_name, list(start_params))
+                unfmt_call = FCall(start_decomp.unfmt_name, [orig_call])
+                fmt_args = [unfmt_call] + [Var(p) for p in start_decomp.frozen_params]
+                entry_body = FCall(start_decomp.fmt_name, fmt_args)
+            else:
+                entry_body = FCall(start_sig_name, list(start_params))
+
             self.rules.insert(
                 0,
-                Rule(Pattern(entry_name, start_params),
-                     FCall(start_sig_name, list(start_params)))
+                Rule(Pattern(entry_name, start_params), entry_body)
             )
 
             self._pull_unresolved_originals()

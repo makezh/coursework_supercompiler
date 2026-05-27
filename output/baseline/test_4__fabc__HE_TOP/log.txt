@@ -1,0 +1,61 @@
+--- Reading samples/test_4.sll ---
+--- Parsing & Type Checking ---
+🔎 Запуск семантического анализа...
+✅ Семантический анализ завершен успешно!
+--- Auto-inferred call: (fabc x1) ---
+--- Supercompiling: (fabc x1) ---
+    Strategy: HE
+    Generalize type: TOP
+    Context: {'x1': TypeExpr(name='List', params=[TypeExpr(name='Letter', params=[])])}
+Running Classical TOP-down Supercompilation...
+[DRIVE] at (fabc x1)  step=TransientStep
+[DRIVE*] at (fbc (fab x1))  step=VariantStep
+[DRIVE] at (fbc (fab [Cons [A] v2]))  step=TransientStep
+[DRIVE*] at (fbc [Cons [B] (fab v2)])  step=TransientStep
+[DRIVE*] at [Cons [C] (fbc (fab v2))]  step=DecomposeStep
+[DRIVE] at (fbc (fab [Cons v3 v4]))  step=VariantStep
+[WHISTLE] alpha=(fbc (fab x1))  beta=(fbc (fab [Cons v3 v4]))  strategy=HE
+[GEN] alpha=(fbc (fab x1))  beta=(fbc (fab [Cons v3 v4])) gen_type=TOP
+[DRIVE] at (fbc (fab [Nil]))  step=TransientStep
+[DRIVE*] at (fbc [Nil])  step=TransientStep
+[DRIVE*] at [Nil]  step=DecomposeStep
+[DRIVE] at [C]  step=DecomposeStep
+[FOLD] beta=(fbc (fab v2))  -> alpha=(fbc (fab x1))
+[DRIVE] at (fbc (fab [Cons [A] v4]))  step=TransientStep
+[DRIVE*] at (fbc [Cons [B] (fab v4)])  step=TransientStep
+[DRIVE*] at [Cons [C] (fbc (fab v4))]  step=DecomposeStep
+[DRIVE] at (fbc [Cons v3 (fab v4)])  step=VariantStep
+[WHISTLE] alpha=(fbc (fab x1))  beta=(fbc [Cons v3 (fab v4)])  strategy=HE
+[GEN] alpha=(fbc (fab x1))  beta=(fbc [Cons v3 (fab v4)]) gen_type=TOP
+[DRIVE] at (fbc v1)  step=VariantStep
+[DRIVE] at (fab x1)  step=VariantStep
+[DRIVE] at [Cons [C] (fbc v6)]  step=DecomposeStep
+[DRIVE] at [Cons v7 (fbc v8)]  step=DecomposeStep
+[DRIVE] at [Nil]  step=DecomposeStep
+[DRIVE] at [Cons [B] (fab v10)]  step=DecomposeStep
+[DRIVE] at [Cons v11 (fab v12)]  step=DecomposeStep
+[DRIVE] at [Nil]  step=DecomposeStep
+[DRIVE] at [C]  step=DecomposeStep
+[FOLD] beta=(fbc v6)  -> alpha=(fbc v1)
+[DRIVE] at v7  step=StopStep
+[FOLD] beta=(fbc v8)  -> alpha=(fbc v1)
+[DRIVE] at [B]  step=DecomposeStep
+[FOLD] beta=(fab v10)  -> alpha=(fab x1)
+[DRIVE] at v11  step=StopStep
+[FOLD] beta=(fab v12)  -> alpha=(fab x1)
+--- Exporting Graph to output/ ---
+Saved .dot file. Install 'graphviz' to generate PNG automatically.
+
+=== RESIDUAL PROGRAM ===
+type [List x] : Cons [x] [List [x]] | Nil  .
+type [Letter] : A  | B  | C  | D  .
+
+
+(f1 x1) -> (g1 (g2 x1));
+(g1 [Cons [B] v6]) -> [Cons [C] (g1 v6)];
+(g1 [Cons v7 v8]) -> [Cons v7 (g1 v8)];
+(g1 [Nil]) -> [Nil];
+(g2 [Cons [A] v10]) -> [Cons [B] (g2 v10)];
+(g2 [Cons v11 v12]) -> [Cons v11 (g2 v12)];
+(g2 [Nil]) -> [Nil];
+========================
