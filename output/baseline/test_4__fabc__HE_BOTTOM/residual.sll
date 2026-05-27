@@ -9,7 +9,6 @@ type [Letter] : A  | B  | C  | D  .
 (g2 [A] v4) -> [Cons [C] (g1 v4)];
 (k1 v1) -> (fbc v1);
 (g2 v3 v4) -> (k1 [Cons v3 (g3 v4)]);
-(f1 v3 v4) -> [Cons v3 (g3 v4)];
 (g3 [Cons [A] v14]) -> [Cons [B] (g3 v14)];
 (g3 [Cons v15 v16]) -> [Cons v15 (g3 v16)];
 (g3 [Nil]) -> [Nil];

@@ -119,7 +119,6 @@ class TestActivationIntegration(unittest.TestCase):
         residual = Residualizer(sc.tree, prog).residualize()
         names = {r.pattern.name for r in residual.rules}
         self.assertIn("fmt_1", names)
-        self.assertIn("unfmt_1", names)
 
         entry = residual.rules[0].pattern.name
         cases = [(_nat(1), _nat(2), _lst(), _lst()),
@@ -142,6 +141,22 @@ class TestActivationIntegration(unittest.TestCase):
         decomposed = [b for b in sc.hypercycle_roots.values() if b.decomposed]
         self.assertEqual(len(decomposed), 1,
                           "Должен быть decomposed ровно один базис (анти-рекурсия)")
+
+    def test_deforestation_drops_frozen_from_main_body(self):
+        sc, prog = _run(_load("active_simple.sll"), "main", "BOTTOM")
+        residual = Residualizer(sc.tree, prog).residualize()
+        main_rule = next(r for r in residual.rules if r.pattern.name == "main")
+        decomp = next(b.active_decomp for b in sc.hypercycle_roots.values()
+                      if b.decomposed)
+        fmt_call = main_rule.body
+        self.assertIsInstance(fmt_call, FCall)
+        self.assertEqual(fmt_call.name, decomp.fmt_name)
+        inner = fmt_call.args[0]
+        self.assertNotIsInstance(inner, FCall,
+                                  msg="Дефорестация должна была убрать unfmt-обёртку, но inner = "
+                                      f"{type(inner).__name__}: {inner}") if not isinstance(inner, FCall) else \
+            self.assertNotEqual(inner.name, decomp.unfmt_name,
+                                 msg=f"main.body должна вызывать дефорестованную функцию, а не {decomp.unfmt_name}")
 
 
 if __name__ == "__main__":

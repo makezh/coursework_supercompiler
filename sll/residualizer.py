@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from sll.ast_nodes import Program, Rule, Pattern, Expr, Var, Ctr, FCall, IntLit, Let
 from sll.process_tree import Node
 from sll.matching import substitute, match, MatchSuccess
@@ -108,8 +108,10 @@ class Residualizer:
             start_decomp = getattr(start_root, "active_decomp", None)
             if start_decomp is not None:
                 orig_call = FCall(start_sig_name, list(start_params))
-                unfmt_call = FCall(start_decomp.unfmt_name, [orig_call])
-                fmt_args = [unfmt_call] + [Var(p) for p in start_decomp.frozen_params]
+                deforested = self._deforest_unfmt(start_decomp, orig_call)
+                inner = deforested if deforested is not None \
+                    else FCall(start_decomp.unfmt_name, [orig_call])
+                fmt_args = [inner] + [Var(p) for p in start_decomp.frozen_params]
                 entry_body = FCall(start_decomp.fmt_name, fmt_args)
             else:
                 entry_body = FCall(start_sig_name, list(start_params))
@@ -120,6 +122,7 @@ class Residualizer:
             )
 
             self._pull_unresolved_originals()
+            self._drop_unreachable(entry_name)
             return Program(self.rules, self._original_types(), [])
 
         # обычный режим
@@ -129,6 +132,56 @@ class Residualizer:
         self._generate_root_entry()
         self._pull_unresolved_originals()
         return Program(self.rules, self._original_types(), [])
+
+    def _drop_unreachable(self, entry_name: str):
+        called = set()
+
+        def collect(e):
+            match e:
+                case FCall(name, args):
+                    called.add(name)
+                    for a in args:
+                        collect(a)
+                case Ctr(_, args):
+                    for a in args:
+                        collect(a)
+                case Let(bindings, body):
+                    for _, v in bindings:
+                        collect(v)
+                    collect(body)
+
+        live = {entry_name}
+        changed = True
+        while changed:
+            changed = False
+            for r in self.rules:
+                if r.pattern.name not in live:
+                    continue
+                before = len(called)
+                collect(r.body)
+                if len(called) > before:
+                    for c in called:
+                        if c not in live:
+                            live.add(c)
+                            changed = True
+        self.rules = [r for r in self.rules if r.pattern.name in live]
+
+    def _deforest_unfmt(self, decomp, basis_call: FCall) -> Optional[Expr]:
+        inner_rules = [r for r in self.rules if r.pattern.name == basis_call.name]
+        if len(inner_rules) != 1:
+            return None
+        inner_rule = inner_rules[0]
+        params = inner_rule.pattern.params
+        if not all(isinstance(p, Var) for p in params):
+            return None
+        sub = {p.name: a for p, a in zip(params, basis_call.args)}
+        inner_body = substitute(inner_rule.body, sub)
+
+        unfmt_pat = decomp.unfmt_rule.pattern.params[0]
+        m = match(unfmt_pat, inner_body)
+        if not isinstance(m, MatchSuccess):
+            return None
+        return substitute(decomp.unfmt_rule.body, m.bindings)
 
     def _pull_unresolved_originals(self):
         if self.original_program is None:
