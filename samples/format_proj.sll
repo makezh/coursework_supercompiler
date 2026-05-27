@@ -1,0 +1,4 @@
+type [Nat] : Z | S [Nat] .
+
+fun (idnat [Nat]) -> [Nat] :
+    (idnat x) -> x .

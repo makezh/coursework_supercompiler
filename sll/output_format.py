@@ -53,9 +53,31 @@ def _collect_vars(expr: Expr) -> Set[str]:
     return seen
 
 
+def _frozen_match(pattern: Expr, value: Expr, frozen: Set[str]) -> bool:
+    match pattern:
+        case Var(name) if name in frozen:
+            return isinstance(value, Var) and value.name == name
+        case Var(_):
+            return True
+        case IntLit(pv):
+            return isinstance(value, IntLit) and value.value == pv
+        case Ctr(pn, pa):
+            if not isinstance(value, Ctr) or value.name != pn or len(pa) != len(value.args):
+                return False
+            return all(_frozen_match(p, v, frozen) for p, v in zip(pa, value.args))
+        case FCall(pn, pa):
+            if not isinstance(value, FCall) or value.name != pn or len(pa) != len(value.args):
+                return False
+            return all(_frozen_match(p, v, frozen) for p, v in zip(pa, value.args))
+        case _:
+            return False
+
+
 def match_value(fmt: OutputFormat, value: Expr) -> bool:
     if fmt.is_bottom:
         return False
+    if fmt.frozen_params:
+        return _frozen_match(fmt.expr, value, fmt.frozen_params)
     return isinstance(match(fmt.expr, value), MatchSuccess)
 
 

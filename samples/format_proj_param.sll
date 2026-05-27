@@ -1,0 +1,4 @@
+type [Nat] : Z | S [Nat] .
+
+fun (wrapS [Nat] [Nat]) -> [Nat] :
+    (wrapS x y) -> [S x] .

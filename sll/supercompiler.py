@@ -9,7 +9,7 @@ from sll.matching import match, MatchSuccess
 from sll.preprocessor import add_tags, Tagger
 from sll.bag_of_tags import TagBag
 from sll.tagging import TagAllocator
-from sll.output_format import BOTTOM as FMT_BOTTOM, gen_format, match_value
+from sll.output_format import BOTTOM as FMT_BOTTOM, gen_format, match_value, _collect_vars
 
 
 def _find_renaming_ancestor(node: Node) -> Node | None:
@@ -492,10 +492,16 @@ class Supercompiler:
         else:
             bases = [self.tree]
 
+        with_param = self.format_level in ("PARAM", "ACTIVE")
+
         for b in bases:
             if b.output_format is None:
                 b.output_format = FMT_BOTTOM
                 b.format_component_root = b
+            if with_param:
+                b.frozen_params = _collect_vars(b.expr)
+            else:
+                b.frozen_params = set()
 
         changed = True
         while changed:
@@ -508,6 +514,7 @@ class Supercompiler:
 
     def _compute_format_for_basis(self, basis: Node, all_bases: List[Node]):
         F = basis.output_format
+        frozen = basis.frozen_params
         inner_changed = True
         while inner_changed:
             inner_changed = False
@@ -515,7 +522,7 @@ class Supercompiler:
                 if v is None:
                     continue
                 if not match_value(F, v):
-                    F = gen_format(F, v)
+                    F = gen_format(F, v, frozen_params=frozen)
                     inner_changed = True
         return F
 
@@ -549,12 +556,11 @@ class Supercompiler:
                 return out
             if isinstance(n.expr, Ctr):
                 child_lists = [walk(c) for c in n.children]
-                if not all(len(cl) == 1 for cl in child_lists):
+                child_lists = [[v for v in cl if v is not None] for cl in child_lists]
+                if any(not cl for cl in child_lists):
                     return [None]
-                args = [cl[0] for cl in child_lists]
-                if any(a is None for a in args):
-                    return [None]
-                return [Ctr(n.expr.name, args)]
+                from itertools import product
+                return [Ctr(n.expr.name, list(combo)) for combo in product(*child_lists)]
             if len(n.children) == 1:
                 return walk(n.children[0])
             return [None]

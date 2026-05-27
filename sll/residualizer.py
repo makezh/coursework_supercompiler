@@ -82,6 +82,8 @@ class Residualizer:
                 return Program([], self._original_types(), [])
 
             for r in roots:
+                if r not in self.node_to_sig:
+                    self._register_func(r)
                 self._find_functions(r)
 
             for node in list(self.node_to_sig.keys()):

@@ -1,0 +1,4 @@
+type [Nat] : Z | S [Nat] .
+
+fun (constY [Nat] [Nat]) -> [Nat] :
+    (constY x y) -> [S [Z]] .

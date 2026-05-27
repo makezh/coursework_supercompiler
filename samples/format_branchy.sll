@@ -1,0 +1,6 @@
+type [Nat] : Z | S [Nat] .
+type [Bool] : True | False .
+
+fun (pick [Bool] [Nat]) -> [Nat] :
+    (pick [True] y) -> [S [Z]]
+  | (pick [False] y) -> [S y] .
