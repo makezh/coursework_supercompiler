@@ -36,6 +36,8 @@ def should_activate(basis_fmt: OutputFormat, ancestor_decomposed: bool) -> bool:
         return False
     if not basis_fmt.frozen_params:
         return False
+    if not basis_fmt.output_vars:
+        return False
     if ancestor_decomposed:
         return False
     return is_unfmt_constructor_expressible(basis_fmt)

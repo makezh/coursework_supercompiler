@@ -1,0 +1,5 @@
+type [Nat] : Z | S [Nat] .
+type [Wrapped a] : Wrap a .
+
+fun (wrapId [Nat]) -> [Wrapped [Nat]] :
+    (wrapId x) -> [Wrap x] .

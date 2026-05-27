@@ -1,0 +1,6 @@
+type [Nat] : Z | S [Nat] .
+type [List a] : Cons a [List a] | Nil .
+
+fun (setHead [List [Nat]] [Nat]) -> [List [Nat]] :
+    (setHead [Cons z xs] y) -> [Cons y xs]
+  | (setHead [Nil] y) -> [Nil] .

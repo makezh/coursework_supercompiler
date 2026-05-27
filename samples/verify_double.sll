@@ -1,0 +1,8 @@
+type [Nat] : Z | S [Nat] .
+
+fun (add [Nat] [Nat]) -> [Nat] :
+    (add [Z] y) -> y
+  | (add [S x] y) -> [S (add x y)] .
+
+fun (double [Nat]) -> [Nat] :
+    (double x) -> (add x x) .

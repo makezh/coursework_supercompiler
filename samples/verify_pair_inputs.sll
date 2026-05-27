@@ -1,0 +1,5 @@
+type [Nat] : Z | S [Nat] .
+type [Pair a b] : MkPair a b .
+
+fun (pair [Nat] [Nat]) -> [Pair [Nat] [Nat]] :
+    (pair a b) -> [MkPair a b] .

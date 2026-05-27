@@ -1,0 +1,9 @@
+type [Nat] : Z | S [Nat] .
+type [List a] : Cons a [List a] | Nil .
+
+fun (append [List a] [List a]) -> [List a] :
+    (append [Cons x xs] ys) -> [Cons x (append xs ys)]
+  | (append [Nil] ys) -> ys .
+
+fun (main [Nat] [Nat] [Nat] [List [Nat]] [List [Nat]]) -> [List [Nat]] :
+    (main a b c xs ys) -> (append [Cons a [Cons b [Cons c xs]]] ys) .

@@ -1,0 +1,6 @@
+type [Nat] : Z | S [Nat] .
+type [List a] : Cons a [List a] | Nil .
+
+fun (length [List [Nat]]) -> [Nat] :
+    (length [Nil]) -> [Z]
+  | (length [Cons x xs]) -> [S (length xs)] .
