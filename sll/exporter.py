@@ -103,7 +103,9 @@ def to_dot(root: Node, dev_mode=False, start_expr=None) -> str:
 
         # 1. Описание самого узла
         # Экранируем кавычки и скобки для DOT
-        if dev_mode:
+        if isinstance(node.expr, FCall) and node.expr.name == "PROGRAM_FOREST":
+            label = "PROGRAM_FOREST"
+        elif dev_mode:
             label = to_tagged_str(node.expr).replace('"', '\\"')
         else:
             label = str(node.expr).replace('"', '\\"')

@@ -243,6 +243,42 @@ class Supercompiler:
 
         return None
 
+    def _branch_vars(self, expr: Expr, var_types: Dict[str, TypeExpr], limit: int = 50) -> set:
+        saved = self.driver.name_gen.counter
+        try:
+            e = expr
+            for _ in range(limit):
+                step = self.driver.drive(e, var_types)
+                if isinstance(step, TransientStep):
+                    e = step.next_expr
+                    continue
+                if isinstance(step, VariantStep):
+                    out = set()
+                    for _, contraction, _, _ in step.branches:
+                        if contraction is None:
+                            continue
+                        if contraction.narrowings:
+                            for k, val in contraction.narrowings.items():
+                                if isinstance(val, Ctr):
+                                    out.add(k)
+                        elif contraction.var_name:
+                            out.add(contraction.var_name)
+                    return out
+                return set()
+            return set()
+        finally:
+            self.driver.name_gen.counter = saved
+
+    def _safe_instance_fold(self, alpha: Node, beta: Node) -> bool:
+        m = match(alpha.expr, beta.expr)
+        if not isinstance(m, MatchSuccess):
+            return False
+        for v in self._branch_vars(alpha.expr, alpha.var_types):
+            val = m.bindings.get(v)
+            if val is not None and not isinstance(val, Var):
+                return False
+        return True
+
     def _generalize(self, alpha: Node, beta: Node, unprocessed: list):
         """
         Реализует стратегию обобщения:
@@ -259,16 +295,11 @@ class Supercompiler:
             self._generalize_bottom(alpha, beta, unprocessed)
             return
 
-        # если gen равен alpha по переименованию:
-        # - если beta тоже переименование alpha → fold (стандартная свёртка)
-        # - если beta имеет БОЛЬШЕ структуры (напр. Cons вместо переменной) →
-        #   НЕ сворачиваем сейчас: beta нужно прогнать дальше, fold наступит
-        #   в рекурсивном подвызове (например, fbc(fab(v2)) вместо fbc(fab(Cons v1 v2)))
         if _is_renaming(alpha.expr, res.gen):
-            if _is_renaming(beta.expr, alpha.expr):
+            if _is_renaming(beta.expr, alpha.expr) or self._safe_instance_fold(alpha, beta):
                 beta.back_link = alpha
                 return True
-            return False  # сигнал: обобщение не выполнено, прогнать beta нормально
+            return False
 
         old_alpha_expr = alpha.expr
         if any(_is_renaming(old_alpha_expr, v) for v in res.sub1.values()):
@@ -358,7 +389,7 @@ class Supercompiler:
         res = msg(alpha.expr, beta.expr)
 
         if _is_renaming(alpha.expr, res.gen):
-            if _is_renaming(beta.expr, alpha.expr):
+            if _is_renaming(beta.expr, alpha.expr) or self._safe_instance_fold(alpha, beta):
                 beta.back_link = alpha
                 return True
             return False

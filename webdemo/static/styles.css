@@ -314,3 +314,38 @@ button.primary:hover { background: #3182ce; }
 button.primary:disabled { background: #a0aec0; cursor: not-allowed; }
 
 .muted { color: #718096; font-size: 12px; }
+
+.residual-block { position: relative; }
+
+.copy-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #edf2f7;
+    color: #4a5568;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    z-index: 1;
+}
+
+.copy-btn:hover { background: #e2e8f0; color: #2d3748; }
+
+.copy-btn.copied {
+    background: #c6f6d5;
+    color: #22543d;
+    border-color: #9ae6b4;
+}
+
+.copy-btn svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}

@@ -20,6 +20,7 @@ class Residualizer:
         self._entry_node: Optional[Node] = None
         self._entry_name: Optional[str] = None
         self._fresh_n = 0
+        self._decomps: List[Tuple[Node, object]] = []
 
     def _rewrite_expr(self, expr: Expr) -> Expr:
         match expr:
@@ -109,6 +110,7 @@ class Residualizer:
                 if decomp is not None:
                     self.rules.append(decomp.fmt_rule)
                     self.rules.append(decomp.unfmt_rule)
+                    self._decomps.append((r, decomp))
 
             start_decomp = getattr(start_root, "active_decomp", None)
             if start_decomp is not None:
@@ -431,6 +433,55 @@ class Residualizer:
             for sub, tmpl in zip(pat.params, templates):
                 self._bind_pattern(sub, resolve_type(tmpl, mapping), ctx, scope)
 
+    def _elaborate(self, expr, t, ctx, scope):
+        if t is None:
+            return
+        if isinstance(expr, Var):
+            scope.setdefault(expr.name, t)
+            return
+        if isinstance(expr, Ctr) and expr.name in ctx.constructors:
+            type_def, templates = ctx.constructors[expr.name]
+            mapping = {}
+            if t.name == type_def.name and len(t.params) == len(type_def.params):
+                mapping = dict(zip(type_def.params, t.params))
+            for sub, tmpl in zip(expr.args, templates):
+                self._elaborate(sub, resolve_type(tmpl, mapping), ctx, scope)
+
+    def _format_signatures(self, ctx) -> Dict[str, FunSig]:
+        overrides: Dict[str, FunSig] = {}
+        for node, decomp in self._decomps:
+            try:
+                out_type = infer_type(node.expr, ctx, dict(node.var_types))
+            except Exception:
+                out_type = None
+            if out_type is None:
+                continue
+            scope: dict = {}
+            self._elaborate(decomp.fmt_rule.body, out_type, ctx, scope)
+            fmt_args = []
+            ok = True
+            for v in decomp.output_vars:
+                tv = scope.get(v)
+                if tv is None:
+                    ok = False
+                    break
+                fmt_args.append(tv)
+            for p in decomp.frozen_params:
+                tp = scope.get(p) or node.var_types.get(p)
+                if tp is None:
+                    ok = False
+                    break
+                fmt_args.append(tp)
+            if not ok:
+                continue
+            overrides[decomp.fmt_name] = FunSig(decomp.fmt_name, fmt_args, out_type)
+            if len(decomp.output_vars) == 1:
+                ret = scope.get(decomp.output_vars[0])
+                if ret is not None:
+                    overrides[decomp.unfmt_name] = FunSig(
+                        decomp.unfmt_name, [out_type], ret)
+        return overrides
+
     def _arg_types(self, clauses, arity, ctx, node, params):
         out = []
         unknown = set()
@@ -559,6 +610,12 @@ class Residualizer:
             sigs[nm] = FunSig(nm, arg_types, self._fresh_type())
             ctx.functions[nm] = sigs[nm]
             unknowns[nm] = unknown
+
+        for nm, sig in self._format_signatures(ctx).items():
+            if nm in sigs:
+                sigs[nm] = sig
+                ctx.functions[nm] = sig
+                unknowns[nm] = set()
 
         for _ in range(len(order) + 2):
             changed = False
