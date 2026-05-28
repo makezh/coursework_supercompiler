@@ -181,22 +181,35 @@ class Program:
     signatures: List[FunSig]   # Список сигнатур функций
 
     def __str__(self):
-        res = ""
-        # Вывод типов
+        blocks = []
+
         for t in self.types:
-            # Формируем строку параметров: если есть params, добавляем пробел перед ними
             params_str = (" " + " ".join(t.params)) if t.params else ""
+            constrs = " | ".join(
+                (f"{c.name} {' '.join(str(a) for a in c.arg_types)}".rstrip())
+                for c in t.constructors
+            )
+            blocks.append(f"type [{t.name}{params_str}] : {constrs} .")
 
-            constrs = " | ".join(f"{c.name} {' '.join(str(a) for a in c.arg_types)}" for c in t.constructors)
+        sig_by_name = {s.name: s for s in self.signatures}
 
-            res += f"type [{t.name}{params_str}] : {constrs} .\n"
+        order = []
+        clauses = {}
+        for r in self.rules:
+            if r.pattern.name not in clauses:
+                clauses[r.pattern.name] = []
+                order.append(r.pattern.name)
+            clauses[r.pattern.name].append(r)
 
-        res += "\n"
+        for name in order:
+            sig = sig_by_name.get(name)
+            body = "\n  | ".join(str(r) for r in clauses[name])
+            if sig is not None:
+                args = " ".join(str(a) for a in sig.arg_types)
+                head = f"({sig.name} {args})" if args else f"({sig.name})"
+                blocks.append(f"fun {head} -> {sig.ret_type} :\n    {body} .")
+            else:
+                blocks.append("\n".join(str(r) + ";" for r in clauses[name]))
 
-        # Вывод сигнатур
-        for s in self.signatures:
-            args = " ".join(str(a) for a in s.arg_types)
-            res += f"fun ({s.name} {args}) -> {s.ret_type} : ...\n"
-
-        return res + "\n" + "\n".join(str(r) + ";" for r in self.rules)
+        return "\n\n".join(blocks)
 # --- Конец Правил и Программ ---

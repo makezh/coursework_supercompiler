@@ -166,12 +166,12 @@ def main():
     else:
         print(f"Saved .dot file. Install 'graphviz' to generate PNG automatically.")
 
-    # --- 7. Резидуализация ---
-    print("\n=== RESIDUAL PROGRAM ===")
+    # --- 7. Построение остаточной программы ---
+    print("\n=== ОСТАТОЧНАЯ ПРОГРАММА ===")
     res = Residualizer(sc.tree, prog)
     new_prog = res.residualize()
     print(new_prog)
-    print("========================")
+    print("============================")
 
 if __name__ == "__main__":
     main()

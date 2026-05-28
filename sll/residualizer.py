@@ -1,8 +1,10 @@
 from typing import List, Dict, Tuple, Optional
-from sll.ast_nodes import Program, Rule, Pattern, Expr, Var, Ctr, FCall, IntLit, Let
+from sll.ast_nodes import (Program, Rule, Pattern, Expr, Var, Ctr, FCall,
+                           IntLit, Let, TypeExpr, FunSig)
 from sll.process_tree import Node
 from sll.matching import substitute, match, MatchSuccess
 from sll.supercompiler import _is_renaming
+from sll.type_checker import TypeContext, infer_type, resolve_type
 
 
 class Residualizer:
@@ -15,6 +17,9 @@ class Residualizer:
         self.g_count = 0
         self.k_count = 0
         self.let_cache: Dict[str, str] = {}
+        self._entry_node: Optional[Node] = None
+        self._entry_name: Optional[str] = None
+        self._fresh_n = 0
 
     def _rewrite_expr(self, expr: Expr) -> Expr:
         match expr:
@@ -123,7 +128,9 @@ class Residualizer:
 
             self._pull_unresolved_originals()
             self._drop_unreachable(entry_name)
-            return Program(self.rules, self._original_types(), [])
+            self._entry_node = start_root
+            self._entry_name = entry_name
+            return Program(self.rules, self._original_types(), self._infer_signatures())
 
         # обычный режим
         self._find_functions(self.root)
@@ -131,7 +138,9 @@ class Residualizer:
             self._generate_definition(node)
         self._generate_root_entry()
         self._pull_unresolved_originals()
-        return Program(self.rules, self._original_types(), [])
+        self._entry_node = self.root
+        self._entry_name = self.rules[0].pattern.name if self.rules else None
+        return Program(self.rules, self._original_types(), self._infer_signatures())
 
     def _drop_unreachable(self, entry_name: str):
         called = set()
@@ -393,6 +402,179 @@ class Residualizer:
         if self.original_program is not None:
             return self.original_program.types
         return []
+
+    def _fresh_type(self) -> TypeExpr:
+        self._fresh_n += 1
+        return TypeExpr(f"t{self._fresh_n}", [])
+
+    def _build_ctx(self) -> TypeContext:
+        ctx = TypeContext()
+        prog = self.original_program
+        for t in prog.types:
+            ctx.defined_types[t.name] = t
+            for c in t.constructors:
+                ctx.constructors[c.name] = (t, c.arg_types)
+        for s in prog.signatures:
+            ctx.functions[s.name] = s
+        return ctx
+
+    def _bind_pattern(self, pat: Expr, t: TypeExpr, ctx: TypeContext, scope: dict):
+        if isinstance(pat, Var):
+            scope[pat.name] = t
+            return
+        name = getattr(pat, "name", None)
+        if name and name in ctx.constructors and getattr(pat, "params", None) is not None:
+            type_def, templates = ctx.constructors[name]
+            mapping = {}
+            if t.name == type_def.name and len(t.params) == len(type_def.params):
+                mapping = dict(zip(type_def.params, t.params))
+            for sub, tmpl in zip(pat.params, templates):
+                self._bind_pattern(sub, resolve_type(tmpl, mapping), ctx, scope)
+
+    def _arg_types(self, clauses, arity, ctx, node, params):
+        out = []
+        unknown = set()
+        for pos in range(arity):
+            t = None
+            if node is not None and params is not None and pos < len(params):
+                pv = params[pos]
+                if isinstance(pv, Var):
+                    t = node.var_types.get(pv.name)
+            if t is None:
+                for cl in clauses:
+                    p = cl.pattern.params[pos]
+                    cn = getattr(p, "name", None)
+                    if cn and cn[:1].isupper() and cn in ctx.constructors:
+                        type_def, _ = ctx.constructors[cn]
+                        t = TypeExpr(type_def.name,
+                                     [self._fresh_type() for _ in type_def.params])
+                        break
+            if t is None:
+                t = self._fresh_type()
+                unknown.add(pos)
+            out.append(t)
+        return out, unknown
+
+    def _find_calls(self, expr, nm, acc):
+        match expr:
+            case FCall(name, args):
+                if name == nm:
+                    acc.append(args)
+                for a in args:
+                    self._find_calls(a, nm, acc)
+            case Ctr(_, args):
+                for a in args:
+                    self._find_calls(a, nm, acc)
+            case Let(bindings, body):
+                for _, e in bindings:
+                    self._find_calls(e, nm, acc)
+                self._find_calls(body, nm, acc)
+
+    def _refine_args_from_calls(self, nm, ctx, sigs, unknown):
+        if not unknown:
+            return False
+        for cl in self.rules:
+            if cl.pattern.name == nm:
+                continue
+            caller_sig = sigs.get(cl.pattern.name)
+            if caller_sig is None:
+                continue
+            calls = []
+            self._find_calls(cl.body, nm, calls)
+            for args in calls:
+                scope = {}
+                try:
+                    for p, at in zip(cl.pattern.params, caller_sig.arg_types):
+                        self._bind_pattern(p, at, ctx, scope)
+                except Exception:
+                    continue
+                changed = False
+                for pos in list(unknown):
+                    if pos >= len(args):
+                        continue
+                    try:
+                        at = infer_type(args[pos], ctx, dict(scope))
+                    except Exception:
+                        continue
+                    if at is not None and at.name in ctx.defined_types:
+                        sigs[nm].arg_types[pos] = at
+                        ctx.functions[nm].arg_types[pos] = at
+                        unknown.discard(pos)
+                        changed = True
+                if changed:
+                    return True
+        return False
+
+    def _infer_ret(self, name, node, ctx) -> Optional[TypeExpr]:
+        if node is not None:
+            try:
+                return infer_type(node.expr, ctx, dict(node.var_types))
+            except Exception:
+                pass
+        sig = ctx.functions.get(name)
+        if sig is None:
+            return None
+        for cl in [r for r in self.rules if r.pattern.name == name]:
+            scope = {}
+            try:
+                for p, at in zip(cl.pattern.params, sig.arg_types):
+                    self._bind_pattern(p, at, ctx, scope)
+                return infer_type(cl.body, ctx, scope)
+            except Exception:
+                continue
+        return None
+
+    def _infer_signatures(self) -> List[FunSig]:
+        if self.original_program is None:
+            return []
+
+        ctx = self._build_ctx()
+
+        name_node: Dict[str, Tuple[Node, List[Var]]] = {}
+        for nd, (nm, params) in self.node_to_sig.items():
+            name_node.setdefault(nm, (nd, params))
+        if self._entry_name is not None and self._entry_name not in name_node \
+                and self._entry_node is not None:
+            entry_params = None
+            for r in self.rules:
+                if r.pattern.name == self._entry_name:
+                    entry_params = r.pattern.params
+                    break
+            name_node[self._entry_name] = (self._entry_node, entry_params)
+
+        order = []
+        seen = set()
+        for r in self.rules:
+            if r.pattern.name not in seen:
+                seen.add(r.pattern.name)
+                order.append(r.pattern.name)
+
+        sigs: Dict[str, FunSig] = {}
+        unknowns: Dict[str, set] = {}
+        for nm in order:
+            clauses = [r for r in self.rules if r.pattern.name == nm]
+            arity = len(clauses[0].pattern.params)
+            node, params = name_node.get(nm, (None, None))
+            arg_types, unknown = self._arg_types(clauses, arity, ctx, node, params)
+            sigs[nm] = FunSig(nm, arg_types, self._fresh_type())
+            ctx.functions[nm] = sigs[nm]
+            unknowns[nm] = unknown
+
+        for _ in range(len(order) + 2):
+            changed = False
+            for nm in order:
+                if self._refine_args_from_calls(nm, ctx, sigs, unknowns[nm]):
+                    changed = True
+                node, _ = name_node.get(nm, (None, None))
+                rt = self._infer_ret(nm, node, ctx)
+                if rt is not None and str(rt) != str(sigs[nm].ret_type):
+                    sigs[nm].ret_type = rt
+                    ctx.functions[nm].ret_type = rt
+                    changed = True
+            if not changed:
+                break
+
+        return [sigs[nm] for nm in order]
 
     def _get_vars(self, expr: Expr) -> List[Var]:
         vars_list = []

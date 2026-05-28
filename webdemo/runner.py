@@ -202,7 +202,7 @@ def summarize_effect(results: Dict[str, CompileResult]) -> Dict[str, str]:
                 f"{off.stats['recursion_arity']} → {active.stats['recursion_arity']}"
             )
         if off.residual_sll != active.residual_sll:
-            summary["residual_change"] = "Активная декомпозиция изменила резидуал."
+            summary["residual_change"] = "Активная декомпозиция изменила остаточную программу."
         if active.formats and any(f.decomposed for f in active.formats):
             decomposed_n = sum(1 for f in active.formats if f.decomposed)
             summary["active_decomp"] = f"Активирована декомпозиция на {decomposed_n} конфигурациях."
