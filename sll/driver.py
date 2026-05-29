@@ -26,6 +26,11 @@ class NameGen:
         self.counter += 1
         return f"{prefix}{self.counter}"
 
+    def reserve(self, names) -> None:
+        for n in names:
+            if n[:1] == "v" and n[1:].isdigit():
+                self.counter = max(self.counter, int(n[1:]))
+
 
 # --- Результаты шага драйвинга ---
 # TransientStep (Транзитный шаг) — шаг вычисления, при котором вызов функции

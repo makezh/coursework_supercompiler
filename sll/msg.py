@@ -39,13 +39,16 @@ class GenResult:
 
 
 class MSGBuilder:
-    def __init__(self):
+    def __init__(self, fresh=None):
         self.counter = 0
+        self._fresh = fresh
         # Значение: уже созданная переменная Var
         self.memo: Dict[Tuple[str, str], Var] = {}
 
     def _fresh_var_name(self) -> str:
         """Генерирует следующее имя переменной: v1, v2, v3..."""
+        if self._fresh is not None:
+            return self._fresh()
         self.counter += 1
         return f"v{self.counter}"
 
@@ -138,9 +141,9 @@ class MSGBuilder:
         return gen, s1, s2
 
 
-def msg(t1: Expr, t2: Expr) -> GenResult:
+def msg(t1: Expr, t2: Expr, fresh=None) -> GenResult:
     """Удобная обертка для вызова"""
-    return MSGBuilder().generalize(t1, t2)
+    return MSGBuilder(fresh=fresh).generalize(t1, t2)
 
 def natural_key(string_key):
     """Превращает 'v10' в ('v', 10) для правильной сортировки"""

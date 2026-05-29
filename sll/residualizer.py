@@ -21,6 +21,7 @@ class Residualizer:
         self._entry_name: Optional[str] = None
         self._fresh_n = 0
         self._decomps: List[Tuple[Node, object]] = []
+        self._pulled_originals: set = set()
 
     def _rewrite_expr(self, expr: Expr) -> Expr:
         match expr:
@@ -50,6 +51,10 @@ class Residualizer:
                 # 2) резидуализируем body
                 new_body = self._rewrite_expr(body)
 
+                # Свободные переменные тела, не связанные let, становятся доп. параметрами k
+                bound = {name for name, _ in new_bindings}
+                extra = [v for v in self._get_vars(new_body) if v.name not in bound]
+
                 # 3) кэш, чтобы одинаковые let не плодили 100 функций
                 key = str(Let(new_bindings, new_body))
                 if key in self.let_cache:
@@ -59,12 +64,12 @@ class Residualizer:
                     kname = f"k{self.k_count}"
                     self.let_cache[key] = kname
 
-                    # k(h1,h2,...) -> body
-                    params = [Var(name) for name, _ in new_bindings]
+                    # k(h1,h2,..., free...) -> body
+                    params = [Var(name) for name, _ in new_bindings] + extra
                     self.rules.append(Rule(Pattern(kname, params), new_body))
 
-                # 4) let ... in ... заменяем на вызов k(e1,e2,...)
-                args = [val for _, val in new_bindings]
+                # 4) let ... in ... заменяем на вызов k(e1,e2,..., free...)
+                args = [val for _, val in new_bindings] + extra
                 return FCall(kname, args, lineno=getattr(expr, "lineno", 0), tag=getattr(expr, "tag", None))
 
             case _:
@@ -227,6 +232,7 @@ class Residualizer:
                 continue
             self.rules.extend(orig_rules)
             defined.add(name)
+            self._pulled_originals.add(name)
             for r in orig_rules:
                 new_called = set()
                 old_called = called.copy()
@@ -378,12 +384,36 @@ class Residualizer:
         entry_body = FCall(root_name, entry_args)
         self.rules.insert(0, Rule(entry_pat, entry_body))
 
+    def _gen_bindings(self, node: Node) -> Dict[str, Node]:
+        out: Dict[str, Node] = {}
+        for c in node.children:
+            if (c.contraction and not self._is_pattern_contraction(c.contraction)
+                    and c.contraction.value is not None):
+                out[c.contraction.var_name] = c
+        return out
+
+    def _call_entry(self, node: Node) -> Expr:
+        func_name, params = self.node_to_sig[node]
+        gen = self._gen_bindings(node)
+        if not gen:
+            return self._call_registered(node, node.expr)
+        vals = {name: self._transform(child) for name, child in gen.items()}
+        # Цепочка обобщений: значение одной переменной может ссылаться на другую
+        # (vN = ... vM ...). Раскрываем вспомогательные привязки до параметров.
+        param_names = {v.name for v in params}
+        aux = {k: v for k, v in vals.items() if k not in param_names}
+        for _ in range(len(aux) + 1):
+            vals = {k: substitute(v, aux) for k, v in vals.items()}
+            aux = {k: substitute(v, aux) for k, v in aux.items()}
+        args = [vals[v.name] if v.name in vals else v for v in params]
+        return FCall(func_name, args)
+
     def _transform(self, node: Node) -> Expr:
         if node.back_link:
             return self._call_registered(node.back_link, node.expr)
 
         if node in self.node_to_sig:
-            return self._call_registered(node, node.expr)
+            return self._call_entry(node)
 
         if isinstance(node.expr, Ctr) and node.children:
              new_args = [self._transform(c) for c in node.children]
@@ -600,9 +630,17 @@ class Residualizer:
                 seen.add(r.pattern.name)
                 order.append(r.pattern.name)
 
+        orig_sigs = {s.name: s for s in self.original_program.signatures}
+
         sigs: Dict[str, FunSig] = {}
         unknowns: Dict[str, set] = {}
         for nm in order:
+            if nm in self._pulled_originals and nm in orig_sigs:
+                src = orig_sigs[nm]
+                sigs[nm] = FunSig(nm, list(src.arg_types), src.ret_type)
+                ctx.functions[nm] = sigs[nm]
+                unknowns[nm] = set()
+                continue
             clauses = [r for r in self.rules if r.pattern.name == nm]
             arity = len(clauses[0].pattern.params)
             node, params = name_node.get(nm, (None, None))
@@ -620,6 +658,8 @@ class Residualizer:
         for _ in range(len(order) + 2):
             changed = False
             for nm in order:
+                if nm in self._pulled_originals and nm in orig_sigs:
+                    continue
                 if self._refine_args_from_calls(nm, ctx, sigs, unknowns[nm]):
                     changed = True
                 node, _ = name_node.get(nm, (None, None))

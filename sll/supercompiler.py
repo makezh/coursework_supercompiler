@@ -57,6 +57,12 @@ def _is_renaming(t1: Expr, t2: Expr) -> bool:
     return isinstance(res1, MatchSuccess) and isinstance(res2, MatchSuccess)
 
 
+def _expr_size(expr: Optional[Expr]) -> int:
+    if isinstance(expr, (Ctr, FCall)):
+        return 1 + sum(_expr_size(a) for a in expr.args)
+    return 1
+
+
 class Supercompiler:
     def __init__(self, program: Program, strategy: str = "HE", gen_type: str = "TOP",
                  format_level: str = "OFF"):
@@ -94,6 +100,8 @@ class Supercompiler:
         if self.strategy == 'TAG' and self.tag_allocator is not None:
             # Размечаем и входное выражение тоже, чтобы у него появились теги
             self.tag_allocator.process_expr(start_expr)
+
+        self.driver.name_gen.reserve(_collect_vars(start_expr) | set(start_var_types))
 
         self.tree = self._create_node(start_expr, start_var_types)
         if self.format_level != "OFF":
@@ -137,6 +145,13 @@ class Supercompiler:
                 beta.back_link = ancestor
                 print(f"[FOLD*] beta={beta.expr}  -> alpha={ancestor.expr}")
                 continue
+
+            if self.gen_type == "BOTTOM":
+                inst = self._find_instance_ancestor(beta)
+                if inst is not None:
+                    beta.back_link = inst
+                    print(f"[FOLD~] beta={beta.expr}  -> alpha={inst.expr}")
+                    continue
 
             # --- Шаг В: Свисток (Whistle) ---
             # Здесь происходит выбор: HE или TAG
@@ -219,17 +234,18 @@ class Supercompiler:
         unprocessed.extend(new_children)
 
     def _find_embedding_ancestor(self, node: Node) -> Node | None:
-    # эвристика: не свистим на конструкторах (можно оставить)
-        if isinstance(node.expr, Ctr):
+    # эвристика: не свистим на нормальных формах и на Let (его расщепляет драйвер)
+        if isinstance(node.expr, (Ctr, Var, IntLit, Let)):
             return None
 
         for alpha in node.ancestors():
             if getattr(alpha.expr, "name", None) == "PROGRAM_FOREST":
                 continue
 
+            if not isinstance(alpha.expr, FCall):
+                continue
+
             if self.strategy == "HE":
-                if not isinstance(alpha.expr, FCall):
-                    continue
                 if he(alpha.expr, node.expr):
                     return alpha
 
@@ -269,6 +285,35 @@ class Supercompiler:
         finally:
             self.driver.name_gen.counter = saved
 
+    @staticmethod
+    def _is_flat_call(expr: Expr) -> bool:
+        if not isinstance(expr, FCall):
+            return False
+        def no_call(e: Expr) -> bool:
+            if isinstance(e, FCall):
+                return False
+            if isinstance(e, Ctr):
+                return all(no_call(a) for a in e.args)
+            return True
+        return all(no_call(a) for a in expr.args)
+
+    def _find_instance_ancestor(self, node: Node) -> Node | None:
+        if not self._is_flat_call(node.expr):
+            return None
+        found = None
+        for alpha in node.ancestors():
+            if getattr(alpha.expr, "name", None) == "PROGRAM_FOREST":
+                continue
+            if not isinstance(alpha.expr, FCall):
+                continue
+            if alpha.expr.name != getattr(node.expr, "name", None):
+                continue
+            if not he(alpha.expr, node.expr):
+                continue
+            if self._safe_instance_fold(alpha, node):
+                found = alpha
+        return found
+
     def _safe_instance_fold(self, alpha: Node, beta: Node) -> bool:
         m = match(alpha.expr, beta.expr)
         if not isinstance(m, MatchSuccess):
@@ -288,7 +333,7 @@ class Supercompiler:
         4. Создаем новых детей для alpha из подстановки (let-binding).
         """
         # 1. Считаем MSG
-        res = msg(alpha.expr, beta.expr)
+        res = msg(alpha.expr, beta.expr, fresh=lambda: self.driver.name_gen.fresh_var("v"))
 
         # если TOP не даёт прогресса, уходим в BOTTOM
         if isinstance(res.gen, Var):
@@ -324,8 +369,17 @@ class Supercompiler:
             if inferred is not None:
                 alpha.var_types[v_name] = inferred
 
+        # Сохраняем let-привязки прошлых обобщений этого же узла:
+        # их поддеревья уже построены, а ссылки на них живут в новом gen.
+        prior_lets = [
+            c for c in alpha.children
+            if c.contraction and c.contraction.value is not None
+            and c.contraction.pattern is None
+            and c.contraction.narrowings is None
+            and not c.contraction.is_default
+        ]
         _remove_children_from_unprocessed(alpha, unprocessed)
-        alpha.children = []  # Очищаем историю (забываем путь, который привел к beta)
+        alpha.children = list(prior_lets)
         alpha.back_link = None
 
         # 3. Создаем новых детей для alpha из подстановки
@@ -386,12 +440,20 @@ class Supercompiler:
         строим Let по beta-контексту и возвращаем beta в очередь,
         чтобы driver разложил Let на детей.
         """
-        res = msg(alpha.expr, beta.expr)
+        res = msg(alpha.expr, beta.expr, fresh=lambda: self.driver.name_gen.fresh_var("v"))
+
+        # Let — структурный узел расщепления, его разлагает драйвер, а не обобщение
+        if self.gen_type == "BOTTOM" and isinstance(beta.expr, Let):
+            return False
 
         if _is_renaming(alpha.expr, res.gen):
             if _is_renaming(beta.expr, alpha.expr) or self._safe_instance_fold(alpha, beta):
                 beta.back_link = alpha
                 return True
+            return False
+
+        # MSG не абстрагирует beta -> Let вырожден в тождество, прогоняем beta как есть
+        if self.gen_type == "BOTTOM" and _is_renaming(beta.expr, res.gen):
             return False
 
         # Книжный случай: разные головы -> MSG дырка -> делаем контекстный Let по beta
@@ -531,16 +593,18 @@ class Supercompiler:
 
     def _find_all_backlink_targets(self, root: Node) -> List[Node]:
         """Собирает все узлы, на которые КТО-ТО ссылается через back_link."""
-        targets = set()
+        seen_ids: set = set()
+        targets: List[Node] = []
 
         def collect(node: Node):
-            if node.back_link:
-                targets.add(node.back_link)
+            if node.back_link and id(node.back_link) not in seen_ids:
+                seen_ids.add(id(node.back_link))
+                targets.append(node.back_link)
             for child in node.children:
                 collect(child)
 
         collect(root)
-        return list(targets)
+        return targets
 
     def apply_active_formats(self):
         if self.hypercycle_roots:
@@ -583,21 +647,38 @@ class Supercompiler:
                 b.frozen_params = _collect_vars(b.expr)
             else:
                 b.frozen_params = set()
+            b.fmt_giveup = False
 
-        changed = True
-        while changed:
+        for _ in range((len(bases) + 1) * self._FMT_MAX_ITERS):
             changed = False
             for b in bases:
+                if b.fmt_giveup:
+                    continue
                 new_F = self._compute_format_for_basis(b, bases)
+                if new_F is None:
+                    b.fmt_giveup = True
+                    b.output_format = FMT_BOTTOM
+                    changed = True
+                    continue
                 if str(new_F) != str(b.output_format):
                     b.output_format = new_F
                     changed = True
+            if not changed:
+                break
+        else:
+            for b in bases:
+                if not b.fmt_giveup and not b.output_format.is_bottom:
+                    b.output_format = FMT_BOTTOM
+
+    # Лимит итераций и размера формата: формат, не сходящийся за эти границы
+    # (растущий аккумулятор), считаем непредставимым -> ⊥.
+    _FMT_MAX_ITERS = 64
+    _FMT_MAX_SIZE = 48
 
     def _compute_format_for_basis(self, basis: Node, all_bases: List[Node]):
         F = basis.output_format
         frozen = basis.frozen_params
-        inner_changed = True
-        while inner_changed:
+        for _ in range(self._FMT_MAX_ITERS):
             inner_changed = False
             for v in self._branch_values(basis, all_bases):
                 if v is None:
@@ -605,7 +686,11 @@ class Supercompiler:
                 if not match_value(F, v):
                     F = gen_format(F, v, frozen_params=frozen)
                     inner_changed = True
-        return F
+                    if _expr_size(F.expr) > self._FMT_MAX_SIZE:
+                        return None
+            if not inner_changed:
+                return F
+        return None
 
     def _branch_values(self, basis: Node, all_bases: List[Node]) -> list:
         def is_pattern_contraction(c):
@@ -630,6 +715,8 @@ class Supercompiler:
                 return [None]
             if not n.children:
                 return [n.expr]
+            if isinstance(n.expr, Let):
+                return walk(n.children[-1])
             if any(is_pattern_contraction(c.contraction) for c in n.children):
                 out = []
                 for c in n.children:
