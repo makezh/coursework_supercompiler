@@ -1,0 +1,18 @@
+type [List x] : Cons x [List x] | Nil .
+type [Letter] : A | B | C | D .
+
+<< A -> B >>
+fun (mapAtoB [List [Letter]]) -> [List [Letter]] :
+    (mapAtoB [Cons [A] xs]) -> [Cons [B] (mapAtoB xs)]
+  | (mapAtoB [Cons x xs]) -> [Cons x (mapAtoB xs)]
+  | (mapAtoB [Nil]) -> [Nil] .
+
+<< B -> C >>
+fun (mapBtoC [List [Letter]]) -> [List [Letter]] :
+    (mapBtoC [Cons [B] xs]) -> [Cons [C] (mapBtoC xs)]
+  | (mapBtoC [Cons x xs]) -> [Cons x (mapBtoC xs)]
+  | (mapBtoC [Nil]) -> [Nil] .
+
+<< Композиция двух проходов: A->B, затем B->C >>
+fun (mapAtoBtoC [List [Letter]]) -> [List [Letter]] :
+    (mapAtoBtoC xs) -> (mapBtoC (mapAtoB xs)) .

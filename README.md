@@ -77,5 +77,5 @@ python3 main.py <путь_к_файлу> <имя_функции_или_выра�
 
 ### Пример
 ```bash
-python3 main.py commute.sll main -o commute/he
+python3 main.py equality_proofs.sll addCommute -o commute/he
 ```

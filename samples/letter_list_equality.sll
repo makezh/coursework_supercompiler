@@ -1,0 +1,11 @@
+type [List x] : Cons x [List x] | Nil .
+type [Letter] : A | B | C | D .
+type [Bool] : True | False .
+
+fun (eqLetterLists [List [Letter]] [List [Letter]]) -> [Bool] :
+    (eqLetterLists [Cons [A] xs] [Cons [A] ys]) -> (eqLetterLists xs ys)
+  | (eqLetterLists [Cons [B] xs] [Cons [B] ys]) -> (eqLetterLists xs ys)
+  | (eqLetterLists [Cons [C] xs] [Cons [C] ys]) -> (eqLetterLists xs ys)
+  | (eqLetterLists [Cons [D] xs] [Cons [D] ys]) -> (eqLetterLists xs ys)
+  | (eqLetterLists [Nil] [Nil]) -> [True]
+  | (eqLetterLists xs ys) -> [False] .

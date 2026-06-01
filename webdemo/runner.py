@@ -185,10 +185,24 @@ def auto_detect_entry(src: str) -> Optional[str]:
     except Exception:
         return None
     names = [s.name for s in prog.signatures]
+    if not names:
+        return None
     for preferred in ("main", "entry", "start"):
         if preferred in names:
             return preferred
-    return names[-1] if names else None
+    called: set = set()
+    for r in prog.rules:
+        called.update(_called_names(r.body))
+    roots = [n for n in names if n not in called]
+    return roots[-1] if roots else names[-1]
+
+
+def list_entries(src: str) -> Dict[str, object]:
+    prog = parse(src)
+    check_program(prog)
+    functions = [{"name": s.name, "arity": len(s.arg_types)}
+                 for s in prog.signatures]
+    return {"functions": functions, "recommended": auto_detect_entry(src)}
 
 
 def summarize_effect(results: Dict[str, CompileResult]) -> Dict[str, str]:

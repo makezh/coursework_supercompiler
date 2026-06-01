@@ -20,7 +20,7 @@
 
             <div class="row">
                 <label for="entry">Точка входа</label>
-                <input type="text" name="entry" id="entry" value="main">
+                <select name="entry" id="entry"></select>
             </div>
 
             <div class="row">
@@ -57,22 +57,36 @@
 <script>
 const $ = id => document.getElementById(id);
 
+async function refreshEntries(src) {
+    const sel = $("entry");
+    const fd = new FormData();
+    fd.append("src", src);
+    let data = {functions: [], recommended: null};
+    try {
+        const r = await fetch("/entries", {method: "POST", body: fd});
+        if (r.ok) data = await r.json();
+    } catch (e) { /* пустой код или ошибка разбора */ }
+    sel.innerHTML = "";
+    for (const f of data.functions) {
+        const opt = document.createElement("option");
+        opt.value = f.name;
+        opt.textContent = f.arity ? `${f.name} (${f.arity})` : f.name;
+        sel.appendChild(opt);
+    }
+    if (data.recommended) sel.value = data.recommended;
+}
+
 $("sample-select").addEventListener("change", async ev => {
     const name = ev.target.value;
     if (!name) return;
     const r = await fetch("/sample/" + encodeURIComponent(name));
     if (r.ok) {
         $("src").value = await r.text();
-        const stem = name.replace(/\.sll$/, "");
-        const guesses = {format_sum:"main", format_const:"constSZ", format_proj:"idnat",
-                          format_proj_param:"wrapS", format_drop_param:"constY",
-                          format_branchy:"pick", format_append:"main",
-                          active_simple:"main", active_evenAndConst:"main",
-                          active_no_trigger:"main"};
-        if (guesses[stem]) $("entry").value = guesses[stem];
-        else $("entry").value = "main";
+        await refreshEntries($("src").value);
     }
 });
+
+$("src").addEventListener("change", () => refreshEntries($("src").value));
 
 $("run-form").addEventListener("submit", async ev => {
     ev.preventDefault();

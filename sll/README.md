@@ -168,8 +168,8 @@ python main.py file.sll function_name \
 Примеры:
 
 ```
-python main.py test_3.sll add3 -g BOTTOM
-python main.py commute.sll main -s TAG -g BOTTOM
+python main.py equality_proofs.sll add3 -g BOTTOM
+python main.py equality_proofs.sll addCommute -s TAG -g BOTTOM
 ```
 
 ---

@@ -1,0 +1,10 @@
+type [Nat] : Z | S [Nat] .
+
+fun (add [Nat] [Nat]) -> [Nat] :
+    (add [Z] y) -> y
+  | (add [S x] y) -> [S (add x y)] .
+
+<< Аккумулирующее сложение: второй аргумент растёт при рекурсии >>
+fun (addAcc [Nat] [Nat]) -> [Nat] :
+    (addAcc [Z] y) -> y
+  | (addAcc [S x] y) -> (addAcc x [S y]) .

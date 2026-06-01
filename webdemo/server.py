@@ -8,7 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from flask import Flask, render_template, request, jsonify, abort, send_from_directory
 
-from webdemo.runner import compile_all_levels, summarize_effect
+from webdemo.runner import compile_all_levels, summarize_effect, list_entries
 
 
 HERE = Path(__file__).resolve().parent
@@ -49,6 +49,17 @@ def sample_content(name):
     if not p.exists():
         abort(404)
     return p.read_text(encoding="utf-8"), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+@app.route("/entries", methods=["POST"])
+def entries_endpoint():
+    src = request.form.get("src", "").strip()
+    if not src:
+        return jsonify({"functions": [], "recommended": None})
+    try:
+        return jsonify(list_entries(src))
+    except Exception:
+        return jsonify({"functions": [], "recommended": None})
 
 
 @app.route("/compile", methods=["POST"])

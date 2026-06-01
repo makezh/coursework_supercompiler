@@ -1,0 +1,15 @@
+type [Nat] : Z | S [Nat] .
+
+fun (add [Nat] [Nat]) -> [Nat] :
+    (add [Z] y) -> y
+  | (add [S x] y) -> [S (add x y)] .
+
+<< Умножение через правую рекурсию >>
+fun (mulRight [Nat] [Nat]) -> [Nat] :
+    (mulRight [Z] y) -> [Z]
+  | (mulRight [S x] y) -> (add y (mulRight x y)) .
+
+<< Умножение через левую рекурсию >>
+fun (mulLeft [Nat] [Nat]) -> [Nat] :
+    (mulLeft [Z] y) -> [Z]
+  | (mulLeft [S x] y) -> (add (mulLeft x y) y) .

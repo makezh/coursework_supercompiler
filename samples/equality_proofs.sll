@@ -1,0 +1,35 @@
+type [Nat] : Z | S [Nat] .
+type [Bool] : True | False .
+
+fun (add [Nat] [Nat]) -> [Nat] :
+    (add [Z] y) -> y
+  | (add [S x] y) -> [S (add x y)] .
+
+fun (eq [Nat] [Nat]) -> [Bool] :
+    (eq [Z] [Z]) -> [True]
+  | (eq [S x] [S y]) -> (eq x y)
+  | (eq x y) -> [False] .
+
+<< (x + y) + z >>
+fun (add3 [Nat] [Nat] [Nat]) -> [Nat] :
+    (add3 x y z) -> (add (add x y) z) .
+
+<< x = x >>
+fun (selfEqual [Nat]) -> [Bool] :
+    (selfEqual x) -> (eq x x) .
+
+<< (S x) = (S x) >>
+fun (succReflexive [Nat]) -> [Bool] :
+    (succReflexive x) -> (eq [S x] [S x]) .
+
+<< x = (S x) >>
+fun (succNeverEqual [Nat]) -> [Bool] :
+    (succNeverEqual x) -> (eq x [S x]) .
+
+<< x + 1 = 1 + x >>
+fun (addCommute [Nat]) -> [Bool] :
+    (addCommute x) -> (eq (add x [S [Z]]) (add [S [Z]] x)) .
+
+<< (x + y) + z = x + (y + z) >>
+fun (addAssoc [Nat] [Nat] [Nat]) -> [Bool] :
+    (addAssoc x y z) -> (eq (add (add x y) z) (add x (add y z))) .
