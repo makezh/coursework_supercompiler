@@ -62,7 +62,7 @@ def _build_one(input_path: Path, out_path: Path, entry: str | None,
 
 def main():
     p = argparse.ArgumentParser(
-        description="Сборка HTML-отчёта по SLL-программе (все 4 уровня формата)."
+        description="Сборка HTML-отчёта по программе на МФЯ (все 4 уровня формата)."
     )
     p.add_argument("input", nargs="?", help="Путь к .sll файлу")
     p.add_argument("--entry", help="Имя точки входа (если не указано — автоопределение)")
