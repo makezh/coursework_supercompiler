@@ -9,7 +9,7 @@ from sll.matching import match, MatchSuccess
 from sll.preprocessor import add_tags, Tagger
 from sll.bag_of_tags import TagBag
 from sll.tagging import TagAllocator
-from sll.output_format import BOTTOM as FMT_BOTTOM, gen_format, match_value, _collect_vars
+from sll.output_format import BOTTOM as FMT_BOTTOM, OutputFormat, gen_format, match_value, _collect_vars
 from sll.active_format import should_activate, build_rules
 
 
@@ -631,6 +631,12 @@ class Supercompiler:
             b.decomposed = True
             b.active_decomp = decomp
 
+    def _top_format(self) -> OutputFormat:
+        """Вершина решётки: формат из одной свежей переменной (любой результат)."""
+        name = self.driver.name_gen.fresh_var("v")
+        return OutputFormat(expr=Var(name), output_vars={name},
+                            frozen_params=set(), is_bottom=False)
+
     def build_simple_formats(self):
         if self.hypercycle_roots:
             bases = list(self.hypercycle_roots.values())
@@ -657,7 +663,7 @@ class Supercompiler:
                 new_F = self._compute_format_for_basis(b, bases)
                 if new_F is None:
                     b.fmt_giveup = True
-                    b.output_format = FMT_BOTTOM
+                    b.output_format = self._top_format()
                     changed = True
                     continue
                 if str(new_F) != str(b.output_format):
@@ -668,10 +674,10 @@ class Supercompiler:
         else:
             for b in bases:
                 if not b.fmt_giveup and not b.output_format.is_bottom:
-                    b.output_format = FMT_BOTTOM
+                    b.output_format = self._top_format()
 
     # Лимит итераций и размера формата: формат, не сходящийся за эти границы
-    # (растущий аккумулятор), считаем непредставимым -> ⊥.
+    # (растущий аккумулятор), считаем непредставимым -> вершину (одна переменная).
     _FMT_MAX_ITERS = 64
     _FMT_MAX_SIZE = 48
 
